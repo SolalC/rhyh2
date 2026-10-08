@@ -74,7 +74,7 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
   id_cols <- tibble(FID = geno_id, IID = geno_id)
 
   stem <- file.path(p$pheno, tissue)
-  bind_cols(id_cols, as_tibble(t(y), .name_repair = "minimal")) |>
+  bind_cols(id_cols, as_tibble(t(y))) |>                 # columns named by gene_id
     write_tsv(paste0(stem, ".phen"), col_names = FALSE, na = "NA")
   write_tsv(tibble(gene_id = rownames(y), mpheno = seq_len(nrow(y))), paste0(stem, ".genes.tsv"))
   bind_cols(id_cols, as_tibble(qcov)) |> write_tsv(paste0(stem, ".qcovar"), col_names = FALSE)

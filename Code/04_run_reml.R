@@ -97,9 +97,11 @@ run_reml <- function(grm_args, tissue, mpheno, mode) {
   tibble(status = "failed", reml_alg = NA_real_, message = paste(messages, collapse = " | "))
 }
 
+# The |h2| > 1 bound applies to the local component only: the distal (LOCO) GRM
+# is full rank (M >> n), so its unconstrained estimate can validly exceed 1.
 is_degenerate <- function(hsq) {
   is.na(hsq$h2_local) || is.na(hsq$se_local) || hsq$se_local <= 0 || abs(hsq$h2_local) > 1 ||
-    (!is.na(hsq$h2_distal) && (is.na(hsq$se_distal) || hsq$se_distal <= 0 || abs(hsq$h2_distal) > 1))
+    (MODEL == "local_distal" && (is.na(hsq$se_distal) || hsq$se_distal <= 0))
 }
 
 fit_gene <- function(g) {

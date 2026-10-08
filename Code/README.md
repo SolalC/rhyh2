@@ -44,6 +44,19 @@ should leave it.
    rank-deficient local GRM a valid solution has h² < 1), records the algorithm used, and
    reports it in `convergence.tsv`. Set `REML_ALGS <- 0` to mimic GCTA defaults. Wheeler
    et al. do not report how they handled non-convergence.
+6. **`local_distal` is optional and fragile at GTEx sample sizes.** The distal component is
+   very imprecise for n ≤ 700 (Wheeler et al. found it non-significant even in DGN, n = 922).
+   In constrained mode GCTA aborts when more than half of the components hit the boundary;
+   those fits are recorded as failed. On the toy data this affected 17% of constrained fits.
+
+7. **Small positive null bias in mean unconstrained h².** In a null simulation (toy
+   genotypes, n = 450, 15 covariates + sex, 108 local GRMs × 25 phenotypes = 2,700 fits,
+   with the fallback and degenerate-fit rule), the mean estimate was 0.0080 (SE 0.0014)
+   rather than 0; Wald type I error was 6.7% at α = 0.05. AI-REML fits alone averaged
+   0.019 and the Fisher-scoring fallbacks −0.020, so discarding non-converged fits would
+   have roughly doubled the bias. GTEx tissue means in Wheeler Table 1 are 0.02–0.06, so
+   a bias of this size matters: run the permutation control (`--perm-seed`) for every
+   analysis and report the permuted mean alongside the observed one.
 
 ## Inputs (paths to set at the top of `config.R`)
 
