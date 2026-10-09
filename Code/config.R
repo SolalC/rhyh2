@@ -24,7 +24,7 @@ GENE_GTF      <- "/QRISdata/Q9564/GENCODE/v50/GRCh38/gencode.v50.annotation.gtf.
 # that. NA = keep all common biallelic SNPs (a documented deviation).
 SNP_KEEP_BED  <- NA
 # Optional file of donor IDs (one per line) to restrict the analysis to, e.g.
-# European-ancestry donors. NA = all genotyped donors.
+# European-ancestry donors, written as in the VCF (GTEX-XXXXX-0003). NA = all genotyped donors.
 DONOR_KEEP    <- NA
 # Output root (use /scratch on Bunya; nothing here is small)
 OUT_DIR       <- "/scratch/user/uqschauq/rhyh2/wheeler2016"

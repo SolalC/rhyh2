@@ -16,7 +16,15 @@ label <- run_label(perm_seed)
 p <- out_paths(OUT_DIR, label)
 
 genes <- read_tsv(file.path(p$genes, "genes.tsv"), col_types = cols(chr = "c"), progress = FALSE)
-genotyped <- read_fam(file.path(p$geno, paste0("chr", AUTOSOMES[1])))$iid
+# Genotype IDs are WGS sample IDs (GTEX-XXXXX-0003); expression and covariates
+# use donor IDs (GTEX-XXXXX). Match on the donor ID, write the genotype ID.
+geno_ids <- tibble(iid = read_fam(file.path(p$geno, paste0("chr", AUTOSOMES[1])))$iid) |>
+  mutate(donor = donor_id(iid))
+if (anyDuplicated(geno_ids$donor)) {
+  warning(sum(duplicated(geno_ids$donor)), " donors have more than one genotyped sample; the first is used")
+  geno_ids <- distinct(geno_ids, donor, .keep_all = TRUE)
+}
+genotyped <- geno_ids$donor
 
 expr_suffix <- paste0("\\.", GTEX_RELEASE, "\\.normalized_expression\\.bed\\.gz$")
 expr_files <- list.files(GTEX_EXPR_DIR, pattern = expr_suffix, full.names = TRUE)
@@ -74,7 +82,8 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
     set.seed(perm_seed * 1000 + tissue_index)
     geno_id <- sample(donors)
   }
-  id_cols <- tibble(FID = geno_id, IID = geno_id)
+  geno_iid <- geno_ids$iid[match(geno_id, geno_ids$donor)]   # IDs as in the .fam / GRM
+  id_cols <- tibble(FID = geno_iid, IID = geno_iid)
 
   stem <- file.path(p$pheno, tissue)
   bind_cols(id_cols, as_tibble(t(y))) |>                 # columns named by gene_id

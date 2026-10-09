@@ -130,3 +130,7 @@ normalise_tissue <- function(x) {
 }
 
 strip_version <- function(ensg) str_remove(ensg, "\\.\\d+$")
+
+# GTEx donor ID from a sample ID: "GTEX-1117F-0003" (WGS VCF) -> "GTEX-1117F".
+# Expression and covariate files use donor IDs; the WGS VCF uses sample IDs.
+donor_id <- function(id) str_replace(id, "^(GTEX-[^-]+).*$", "\\1")

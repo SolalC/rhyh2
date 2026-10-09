@@ -41,7 +41,7 @@ vcf <- gzfile(file.path(out_dir, "toy.vcf.gz"), "w")
 writeLines(c("##fileformat=VCFv4.2",
              map_chr(chrs, \(chr) sprintf("##contig=<ID=chr%d,length=%d>", chr, chr_len)),
              '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
-             paste(c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", donors), collapse = "\t"),
+             paste(c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", paste0(donors, "-0003")), collapse = "\t"),   # WGS sample IDs, as in GTEx
              vcf_body), vcf)
 close(vcf)
 
