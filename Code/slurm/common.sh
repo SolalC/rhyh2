@@ -1,7 +1,8 @@
-# Shared settings for the SLURM scripts. EDIT THESE on Bunya.
+# Shared settings for the SLURM scripts. Check R_MODULE on Bunya.
 # Account, partition, constraint and resources are in each .slurm header.
 # Job logs go to slurm/logs/ (relative to the submission folder).
-CODE_DIR="/PATH/TO/rhyh2/Code"            # this folder, on Bunya
+# Code/ folder = parent of this slurm/ folder (no need to edit)
+CODE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 R_MODULE="r/4.4.0-gfbf-2023a"             # check: module avail r
 # Uncomment if plink2/gcta64 are modules rather than full paths in config.R:
 # PLINK2_MODULE="plink/2.00a3.7"
