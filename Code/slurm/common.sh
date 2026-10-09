@@ -1,11 +1,11 @@
 # Shared settings for the SLURM scripts. EDIT THESE on Bunya.
 # Account, partition, constraint and resources are in each .slurm header.
 # Job logs go to slurm/logs/ (relative to the submission folder).
-CODE_DIR="/PATH/TO/rhyh2/Code"            # this folder, on Bunya
-R_MODULE="r/4.4.0-gfbf-2023a"             # check: module avail r
+CODE_DIR="/scratch/user/uqschauq/rhyh2/Code"            # this folder, on Bunya
+R_MODULE="r/4.4.2-heavy"             # check: module avail r
 # Uncomment if plink2/gcta64 are modules rather than full paths in config.R:
-# PLINK2_MODULE="plink/2.00a3.7"
-# GCTA_MODULE="gcta/1.94.1"
+# PLINK2='/home/uqschauq/software/plink2'
+# GCTA_MODULE="/home/uqschauq/software/squashfs-root/AppRun "
 export RHYH2_CONFIG="${RHYH2_CONFIG:-$CODE_DIR/config.R}"
 
 load_modules() {

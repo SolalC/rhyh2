@@ -32,8 +32,8 @@ OUT_DIR       <- "/scratch/user/uqschauq/rhyh2/wheeler2016"
 # (see reference/get_genarchdb.sh). NA = skip the per-gene comparison.
 GENARCH_DB    <- NA
 # Executables (module names on Bunya may differ; full paths are safest)
-PLINK2        <- "plink2"
-GCTA          <- "gcta64"
+PLINK2 <- "/home/uqschauq/software/plink2"
+GCTA   <- "/home/uqschauq/software/squashfs-root/AppRun"
 # Node-local temporary directory for per-gene GRMs
 TMP_ROOT      <- Sys.getenv("TMPDIR", unset = tempdir())
 

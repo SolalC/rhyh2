@@ -7,7 +7,6 @@
 #SBATCH --time=24:00:00
 #SBATCH --partition=general
 #SBATCH --array 1-200
-#SBATCH --constraint=epyc3
 #SBATCH --account=a_imb_cpdg
 #SBATCH -o logs/%x_%A_%a.out
 #SBATCH -e logs/%x_%A_%a.err

@@ -6,7 +6,6 @@
 #SBATCH --job-name=rhyh2_02_genes
 #SBATCH --time=06:00:00
 #SBATCH --partition=general
-#SBATCH --constraint=epyc3
 #SBATCH --account=a_imb_cpdg
 #SBATCH -o logs/%x_%j.out
 #SBATCH -e logs/%x_%j.err

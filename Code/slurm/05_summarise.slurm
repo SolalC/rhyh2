@@ -6,7 +6,6 @@
 #SBATCH --job-name=rhyh2_05_summ
 #SBATCH --time=01:00:00
 #SBATCH --partition=general
-#SBATCH --constraint=epyc3
 #SBATCH --account=a_imb_cpdg
 #SBATCH -o logs/%x_%j.out
 #SBATCH -e logs/%x_%j.err
