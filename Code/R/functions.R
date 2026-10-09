@@ -54,6 +54,10 @@ out_paths <- function(out_dir, label = "observed") {
 
 # Run a command; stop with its log tail if it fails (unless allow_fail = TRUE)
 run_cmd <- function(exe, args, log_file = NULL, allow_fail = FALSE) {
+  if (!nzchar(Sys.which(exe))) {
+    stop("Cannot find executable '", exe, "' from R (PATH = ", Sys.getenv("PATH"), "). ",
+         "Set PLINK2 / GCTA in config.R to the full path of the program.")
+  }
   args <- as.character(args)
   out <- suppressWarnings(system2(exe, shQuote(args), stdout = TRUE, stderr = TRUE))
   status <- attr(out, "status") %||% 0L
