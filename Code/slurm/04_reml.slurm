@@ -1,12 +1,16 @@
-#!/bin/bash
-#SBATCH --job-name=rhyh2_04_reml
-#SBATCH --partition=general
-#SBATCH --array=1-200
+#!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
+#SBATCH --job-name=rhyh2_04_reml
 #SBATCH --time=24:00:00
+#SBATCH --partition=general
+#SBATCH --array 1-200
+#SBATCH --constraint=epyc3
+#SBATCH --account=a_imb_cpdg
+#SBATCH -o logs/%x_%A_%a.out
+#SBATCH -e logs/%x_%A_%a.err
 # Step 04: GCTA REML, one array task per gene chunk. The array size must equal
 # N_CHUNKS in config.R. Finished chunks are skipped, so failed tasks can simply
 # be resubmitted (sbatch --array=<ids> ...).

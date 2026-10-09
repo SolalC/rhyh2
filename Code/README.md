@@ -90,7 +90,7 @@ and runs all five steps, observed and permuted, then checks the results.
 PLINK2=/path/to/plink2 GCTA=/path/to/gcta64 bash Code/tests/run_toy_test.sh
 ```
 
-**Bunya:** edit `config.R` (paths) and `slurm/common.sh` (account, R module, code path), then
+**Bunya:** edit `config.R` (paths) and `slurm/common.sh` (code path, R module); account, partition and resources are in each `.slurm` header. Job logs go to `slurm/logs/`. Then
 
 ```bash
 cd Code/slurm

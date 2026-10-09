@@ -1,11 +1,15 @@
-#!/bin/bash
-#SBATCH --job-name=rhyh2_05_summ
-#SBATCH --partition=general
+#!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32G
+#SBATCH --job-name=rhyh2_05_summ
 #SBATCH --time=01:00:00
+#SBATCH --partition=general
+#SBATCH --constraint=epyc3
+#SBATCH --account=a_imb_cpdg
+#SBATCH -o logs/%x_%j.out
+#SBATCH -e logs/%x_%j.err
 # Step 05: combine chunks, summaries and comparison with Wheeler et al. 2016.
 set -euo pipefail
 source "$SLURM_SUBMIT_DIR/common.sh"   # submit_all.sh submits from slurm/

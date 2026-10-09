@@ -6,16 +6,14 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source common.sh
-mkdir -p "$LOG_DIR"
+mkdir -p logs                          # SLURM needs it before the jobs start
 FROM=01
 for a in "$@"; do [[ $a == --from=* ]] && FROM="${a#--from=}"; done
-SUFFIX="${PERM_SEED:+_perm$PERM_SEED}"
 
 submit() {  # submit <script> [dependency job id]
   local dep=()
   [[ -n "${2:-}" ]] && dep=(--dependency=afterok:"$2")
-  sbatch --parsable --account="$ACCOUNT" --export=ALL "${dep[@]}" \
-    --output="$LOG_DIR/%x_%A_%a$SUFFIX.out" "$1"
+  sbatch --parsable --export=ALL "${dep[@]}" "$1"
 }
 
 jid=""

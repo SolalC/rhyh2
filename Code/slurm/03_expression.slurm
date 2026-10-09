@@ -1,11 +1,15 @@
-#!/bin/bash
-#SBATCH --job-name=rhyh2_03_expr
-#SBATCH --partition=general
+#!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32G
+#SBATCH --job-name=rhyh2_03_expr
 #SBATCH --time=02:00:00
+#SBATCH --partition=general
+#SBATCH --constraint=epyc3
+#SBATCH --account=a_imb_cpdg
+#SBATCH -o logs/%x_%j.out
+#SBATCH -e logs/%x_%j.err
 # Step 03: phenotype and covariate files per tissue.
 # Optional: export PERM_SEED=<n> before submitting for a permutation run.
 set -euo pipefail
