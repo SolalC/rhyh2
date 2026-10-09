@@ -31,9 +31,20 @@ tissues <- read_tsv(file.path(p$pheno, "tissues.tsv"), progress = FALSE, show_co
 tissue_genes <- map(tissues$tissue, \(t)
   read_tsv(file.path(p$pheno, paste0(t, ".genes.tsv")), col_types = "ci", progress = FALSE) |>
     mutate(tissue = t)) |>
-  list_rbind()
+  list_rbind(ptype = tibble(gene_id = character(), mpheno = integer(), tissue = character()))
 
+if (nrow(tissues) == 0) {
+  stop("No tissue has status 'ok' in ", file.path(p$pheno, "tissues.tsv"),
+       ". Check step 03's log: tissues are skipped when fewer than MIN_SAMPLES donors are ",
+       "in the expression file, the covariate file and the genotypes at once.")
+}
+n_genes_tsv <- nrow(genes)
 genes <- filter(genes, gene_id %in% tissue_genes$gene_id)
+if (nrow(genes) < 2) {
+  stop(nrow(genes), " gene(s) to fit: genes.tsv has ", n_genes_tsv, " genes, the ", nrow(tissues),
+       " tissue(s) from step 03 have ", n_distinct(tissue_genes$gene_id), " expressed genes, and ",
+       nrow(genes), " are in both. Check genes.tsv (step 02) and the n_genes column of tissues.tsv.")
+}
 if (!is.na(perm_seed)) {
   set.seed(perm_seed)
   genes <- genes |> slice_sample(prop = PERM_GENE_FRACTION) |> arrange(as.integer(chr), start)
