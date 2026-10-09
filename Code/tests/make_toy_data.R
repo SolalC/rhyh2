@@ -24,8 +24,8 @@ n_factors  <- 15
 donors <- sprintf("GTEX-T%04d", seq_len(n_donors))
 
 # ---- genotypes ----
-snps <- map(chrs, \(c) {
-  tibble(chr = c, pos = sort(sample.int(chr_len, snps_per_chr)),
+snps <- map(chrs, \(chr) {
+  tibble(chr = chr, pos = sort(sample.int(chr_len, snps_per_chr)),
          maf = runif(snps_per_chr, 0.01, 0.5),
          ref_alt = sample(c("AC", "AG", "CT", "GT", "AT", "CG"), snps_per_chr, replace = TRUE,
                           prob = c(.22, .22, .22, .22, .06, .06)))
@@ -39,16 +39,16 @@ vcf_body <- map_chr(seq_len(nrow(snps)), \(j)
           gt_string[G[, j] + 1]), collapse = "\t"))
 vcf <- gzfile(file.path(out_dir, "toy.vcf.gz"), "w")
 writeLines(c("##fileformat=VCFv4.2",
-             map_chr(chrs, \(c) sprintf("##contig=<ID=chr%d,length=%d>", c, chr_len)),
+             map_chr(chrs, \(chr) sprintf("##contig=<ID=chr%d,length=%d>", chr, chr_len)),
              '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
              paste(c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", donors), collapse = "\t"),
              vcf_body), vcf)
 close(vcf)
 
 # ---- genes (GTF) ----
-genes <- map(chrs, \(c) {
+genes <- map(chrs, \(chr) {
   start <- sort(sample(seq(1.5e6, chr_len - 1.5e6, by = 1000), genes_per_chr))
-  tibble(chr = c, start = start, end = start + sample(5e3:80e3, genes_per_chr, replace = TRUE))
+  tibble(chr = chr, start = start, end = start + sample(5e3:80e3, genes_per_chr, replace = TRUE))
 }) |> list_rbind() |>
   mutate(gene_id = sprintf("ENSG%011d.%d", row_number(), sample(1:9, n(), replace = TRUE)),
          gene_name = sprintf("TOY%03d", row_number()),

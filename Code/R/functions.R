@@ -117,7 +117,7 @@ read_hsq <- function(file) {
 
 # ---- misc -------------------------------------------------------------------
 
-# Harmonise tissue labels across GTEx v8, Wheeler Table 1 and GenArchDB
+# Harmonise tissue labels across GTEx releases, Wheeler Table 1 and GenArchDB
 normalise_tissue <- function(x) {
   x |>
     str_remove("_(TW|TS)$") |>

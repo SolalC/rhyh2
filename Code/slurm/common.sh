@@ -1,7 +1,7 @@
 # Shared settings for the SLURM scripts. EDIT THESE for your Bunya account.
 ACCOUNT="a_YOUR_ACCOUNT"                  # Bunya project account (sbatch --account)
 CODE_DIR="/PATH/TO/rhyh2/Code"            # this folder, on Bunya
-LOG_DIR="/PATH/TO/scratch/rhyh2/wheeler2016/logs"
+LOG_DIR="/scratch/user/uqschauq/rhyh2/wheeler2016/logs"
 R_MODULE="r/4.4.0-gfbf-2023a"             # check: module avail r
 # Uncomment if plink2/gcta64 are modules rather than full paths in config.R:
 # PLINK2_MODULE="plink/2.00a3.7"

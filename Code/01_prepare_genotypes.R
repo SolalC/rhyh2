@@ -1,4 +1,4 @@
-# Step 01 — genotypes: GTEx v8 VCF -> per-chromosome PLINK binary files with
+# Step 01 — genotypes: GTEx WGS VCF -> per-chromosome PLINK binary files with
 # common (MAF > MAF_MIN), biallelic, non-ambiguous autosomal SNPs.
 # The VCF is read once (PLINK 2 cannot seek by chromosome in a VCF).
 #

@@ -3,6 +3,7 @@
 source(file.path(Sys.getenv("RHYH2_CODE_DIR"), "config.R"), local = globalenv())
 
 TOY_DIR       <- Sys.getenv("TOY_DIR")
+GTEX_RELEASE  <- "v8"                # toy files are named .v8.
 GTEX_VCF      <- file.path(TOY_DIR, "toy.vcf.gz")
 GTEX_EXPR_DIR <- file.path(TOY_DIR, "expression")
 GTEX_COV_DIR  <- file.path(TOY_DIR, "covariates")

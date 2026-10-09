@@ -17,7 +17,7 @@ genes <- read_gtf_genes(GENE_GTF) |>
   filter(gene_type %in% GENE_TYPES, chr %in% as.character(AUTOSOMES)) |>
   mutate(win_start = pmax(1, start - CIS_WINDOW_BP), win_end = end + CIS_WINDOW_BP)
 
-snp_pos <- map(AUTOSOMES, \(c) read_bim(geno_prefix(c)) |> select(chr, pos)) |>
+snp_pos <- map(AUTOSOMES, \(chr) read_bim(geno_prefix(chr)) |> select(chr, pos)) |>
   list_rbind() |>
   mutate(chr = str_remove(chr, "^chr")) |>
   split(~chr) |>

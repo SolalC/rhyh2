@@ -1,5 +1,5 @@
 # Step 03 — expression phenotypes and covariates per tissue (GCTA format).
-#   Expression: GTEx v8 normalised matrices (TMM + inverse-normal transform),
+#   Expression: GTEx (GTEX_RELEASE) normalised matrices (TMM + inverse-normal transform),
 #   restricted to genes in genes.tsv and to donors with genotypes.
 #   Covariates: N_FACTORS PEER factors (or expression PCs), optional genotype
 #   PCs, and sex (dropped when constant, e.g. sex-specific tissues).
@@ -18,8 +18,9 @@ p <- out_paths(OUT_DIR, label)
 genes <- read_tsv(file.path(p$genes, "genes.tsv"), col_types = cols(chr = "c"), progress = FALSE)
 genotyped <- read_fam(file.path(p$geno, paste0("chr", AUTOSOMES[1])))$iid
 
-expr_files <- list.files(GTEX_EXPR_DIR, pattern = "\\.v8\\.normalized_expression\\.bed\\.gz$", full.names = TRUE)
-tissue_names <- str_remove(basename(expr_files), "\\.v8\\.normalized_expression\\.bed\\.gz$")
+expr_suffix <- paste0("\\.", GTEX_RELEASE, "\\.normalized_expression\\.bed\\.gz$")
+expr_files <- list.files(GTEX_EXPR_DIR, pattern = expr_suffix, full.names = TRUE)
+tissue_names <- str_remove(basename(expr_files), expr_suffix)
 if (!is.null(TISSUES)) {
   keep <- tissue_names %in% TISSUES
   expr_files <- expr_files[keep]; tissue_names <- tissue_names[keep]
@@ -27,12 +28,14 @@ if (!is.null(TISSUES)) {
 if (length(expr_files) == 0) stop("No expression files found in ", GTEX_EXPR_DIR)
 
 prepare_tissue <- function(tissue, expr_file, tissue_index) {
-  expr <- read_tsv(expr_file, col_types = cols(.default = "d", `#chr` = "c", gene_id = "c"),
-                   progress = FALSE) |>
-    mutate(gene_key = strip_version(gene_id)) |>
-    semi_join(genes |> mutate(gene_key = strip_version(gene_id)), by = "gene_key")
+  expr_all <- read_tsv(expr_file, col_types = cols(.default = "d", `#chr` = "c", gene_id = "c"),
+                       progress = FALSE) |>
+    mutate(gene_key = strip_version(gene_id))
+  expr <- semi_join(expr_all, genes |> mutate(gene_key = strip_version(gene_id)), by = "gene_key")
+  n_dropped <- nrow(expr_all) - nrow(expr)               # not in genes.tsv (other gene types,
+  rm(expr_all)                                           # chrX, absent from GENE_GTF, 0 SNPs)
 
-  cov_raw <- read_tsv(file.path(GTEX_COV_DIR, paste0(tissue, ".v8.covariates.txt")),
+  cov_raw <- read_tsv(file.path(GTEX_COV_DIR, paste0(tissue, ".", GTEX_RELEASE, ".covariates.txt")),
                       col_types = cols(.default = "d", ID = "c"), progress = FALSE)
 
   donors <- intersect(intersect(names(expr), genotyped), names(cov_raw))
@@ -85,9 +88,9 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
   }
   write_tsv(id_cols, paste0(stem, ".keep"), col_names = FALSE)
 
-  message(tissue, ": n = ", length(donors), ", genes = ", nrow(y),
+  message(tissue, ": n = ", length(donors), ", genes = ", nrow(y), " (", n_dropped, " not in genes.tsv)",
           ", quantitative covariates = ", ncol(qcov), ", sex = ", use_sex)
-  tibble(tissue = tissue, n = length(donors), n_genes = nrow(y), status = "ok",
+  tibble(tissue = tissue, n = length(donors), n_genes = nrow(y), n_genes_not_in_annotation = n_dropped, status = "ok",
          n_qcovar = ncol(qcov), sex_covariate = use_sex, cov_source = COV_SOURCE)
 }
 
