@@ -20,6 +20,8 @@ print(cmp); print(perm_mean)
 checks <- c(
   "only protein-coding genes analysed"   = all(obs$gene_id %in% truth$gene_id[truth$gene_type == "protein_coding"]),
   "tissue with n < 70 skipped"           = tissues$status[tissues$tissue == "Tissue_TooSmall"] == "skipped_small_n",
+  "single-sex tissue runs without sex"   = tissues$status[tissues$tissue == "Tissue_OneSex"] == "ok" &&
+                                           !tissues$sex_covariate[tissues$tissue == "Tissue_OneSex"],
   "all fits converged (local_only)"      = Sys.getenv("TOY_MODEL", "local_only") != "local_only" || all(obs$status == "ok"),
   "mean h2 within 3 SE of truth"         = all(abs(cmp$mean_est - cmp$mean_true) < 3 * cmp$se_mean),
   "estimates track truth (r > 0.7, big tissue)" = cmp$cor_true_est[cmp$tissue == "Tissue_Big"] > 0.7,

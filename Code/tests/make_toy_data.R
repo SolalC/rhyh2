@@ -78,8 +78,11 @@ Y <- map(seq_len(nrow(genes)), \(i) {
 }) |> do.call(what = rbind)                                   # genes x donors
 colnames(Y) <- donors
 
-write_tissue <- function(tissue, n) {
-  ids <- sort(sample(donors, n))
+# one_sex: NA = both sexes; 1 or 2 = that sex only, with the sex row omitted
+# from the covariate file, as GTEx does for single-sex tissues.
+write_tissue <- function(tissue, n, one_sex = NA) {
+  pool <- if (is.na(one_sex)) donors else donors[sex == one_sex]
+  ids <- sort(sample(pool, n))
   inv_norm <- \(x) qnorm((rank(x) - 0.5) / length(x))
   y <- t(apply(Y[, ids], 1, inv_norm)); colnames(y) <- ids
   bed <- bind_cols(tibble(`#chr` = paste0("chr", genes$chr), start = genes$start - 1L,
@@ -90,10 +93,12 @@ write_tissue <- function(tissue, n) {
     matrix(rnorm(5 * n), 5, n, dimnames = list(paste0("PC", 1:5), ids)),
     t(factors[match(ids, donors), ]) |> `rownames<-`(paste0("InferredCov", seq_len(n_factors))),
     pcr = rep(1, n), platform = rep(1, n), sex = sex[match(ids, donors)])
+  if (!is.na(one_sex)) cov <- cov[rownames(cov) != "sex", , drop = FALSE]
   bind_cols(tibble(ID = rownames(cov)), as_tibble(round(cov, 6))) |>
     write_tsv(file.path(out_dir, "covariates", paste0(tissue, ".v8.covariates.txt")))
 }
 write_tissue("Tissue_Big", 450)
 write_tissue("Tissue_Small", 200)
 write_tissue("Tissue_TooSmall", 50)      # must be skipped (n < 70)
+write_tissue("Tissue_OneSex", 150, one_sex = 2)   # no sex row, like GTEx ovary
 message("Toy data written to ", out_dir)

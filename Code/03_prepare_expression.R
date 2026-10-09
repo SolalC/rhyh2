@@ -73,7 +73,10 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
     stop("Unknown COV_SOURCE: ", COV_SOURCE)
   )
   qcov <- if (N_GENO_PCS > 0) cbind(factors, get_rows(paste0("PC", seq_len(N_GENO_PCS)))) else factors
-  sex <- if (USE_SEX) get_rows("sex")[, 1] else NULL
+  # Sex is dropped when constant or absent: GTEx omits the sex row for
+  # single-sex tissues (ovary, testis, ...), and a constant column is collinear
+  # with the intercept.
+  sex <- if (USE_SEX && "sex" %in% cov_t$ID) get_rows("sex")[, 1] else NULL
   use_sex <- !is.null(sex) && length(unique(sex)) > 1
 
   # ---- donor labels (permuted for the negative control) ----
