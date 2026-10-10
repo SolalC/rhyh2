@@ -45,8 +45,10 @@ DROP_AMBIGUOUS_SNPS <- TRUE  # drop A/T and C/G SNPs
 AUTOSOMES     <- 1:22
 GENE_TYPES    <- "protein_coding"
 CIS_WINDOW_BP <- 1e6         # SNPs within 1 Mb of gene start and end
-MODEL         <- "local_only"   # Wheeler's final model; "local_distal" adds a
-                                # leave-one-chromosome-out GRM
+MODEL         <- "local_rhythmic" # "local_only" = Wheeler's final model;
+                                # "local_distal" adds a leave-one-chromosome-out GRM;
+                                # "local_rhythmic" adds K_local o cos(w(t_i - t_j))
+                                # (isotropic cosinor; see PHASE_* below)
 REML_MODES    <- c("unconstrained", "constrained")  # means use unconstrained
 # Covariates: Wheeler used 15 PEER factors + sex, no genotype PCs.
 COV_SOURCE    <- "gtex_peer"    # "gtex_peer" = first N_FACTORS InferredCov
@@ -63,6 +65,13 @@ N_CHUNKS      <- 200            # SLURM array size for step 04
 THREADS       <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
 FDR_LEVEL     <- 0.1
 SEED          <- 20261008
+# Rhythmic model (MODEL = "local_rhythmic"): inferred circadian phase per donor.
+# The file is an .RData holding a named numeric vector PHASE_OBJECT; names are
+# donor IDs without PHASE_ID_PREFIX (e.g. "1117F" for GTEX-1117F).
+PHASE_FILE      <- "/scratch/project_mnt/S0007/solal/circadian/Data/CHIRAL/DIP.RData"
+PHASE_OBJECT    <- "phi"
+PHASE_ID_PREFIX <- "GTEX-"
+PHASE_PERIOD    <- 2 * pi       # one cycle in the phase's units: 2*pi = radians, 24 = hours
 # Permutation (negative control): run steps 03-05 with --perm-seed=<n>.
 # Genotype-to-sample labels are shuffled within tissue; expected mean h2 = 0.
 PERM_GENE_FRACTION <- 0.1       # fraction of genes analysed in permuted runs

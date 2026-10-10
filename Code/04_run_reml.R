@@ -2,7 +2,9 @@
 #   For each gene: local GRM from SNPs in [start - 1 Mb, end + 1 Mb] (all
 #   donors, built once and reused across tissues), then REML in every tissue
 #   expressing the gene, restricted to that tissue's donors with --keep.
-#   MODEL "local_only" (Wheeler's final model) or "local_distal" (adds LOCO GRM).
+#   MODEL "local_only" (Wheeler's final model), "local_distal" (adds LOCO GRM) or
+#   "local_rhythmic" (adds K_local o cos(w(t_i - t_j)) for the tissue's donors;
+#   the LRT then tests the rhythmic component).
 #   REML_MODES: "unconstrained" (--reml-no-constrain; used for means and the
 #   two-sided P-value) and/or "constrained" (estimates bounded to [0, 1]).
 #
@@ -67,6 +69,13 @@ walk(unique(my_genes$chr), \(chr) {
 })
 region_bim <- map(set_names(unique(my_genes$chr)), \(chr) read_bim(region_prefix(chr)))
 
+if (MODEL == "local_rhythmic") {
+  source(file.path(code_dir(), "R", "grm_io.R"))
+  tissue_phase <- map(set_names(tissues$tissue), \(t)
+    read_tsv(file.path(p$pheno, paste0(t, ".phase")), col_names = c("fid", "iid", "phase"),
+             col_types = "ccd", progress = FALSE))
+}
+
 # ---- REML -------------------------------------------------------------------
 # Tries each algorithm in REML_ALGS in turn (0 = AI, GCTA's default; 1 = Fisher
 # scoring; 2 = EM) and keeps the first that converges. Unconstrained AI-REML
@@ -89,12 +98,14 @@ run_reml <- function(grm_args, tissue, mpheno, mode) {
       "--qcovar", paste0(stem, ".qcovar"),
       if (file.exists(paste0(stem, ".covar"))) c("--covar", paste0(stem, ".covar")),
       if (mode == "unconstrained") "--reml-no-constrain",
-      "--reml-alg", alg, "--reml-lrt", "1", "--reml-maxit", REML_MAXIT,
+      "--reml-alg", alg, "--reml-lrt", if (MODEL == "local_rhythmic") "2" else "1",
+      "--reml-maxit", REML_MAXIT,
       "--thread-num", THREADS, "--out", out
     )
     res <- run_cmd(GCTA, reml_args, allow_fail = TRUE)
     if (res$status == 0 && file.exists(paste0(out, ".hsq"))) {
       hsq <- read_hsq(paste0(out, ".hsq"))
+      if (MODEL == "local_rhythmic") hsq <- rename(hsq, h2_rhy = h2_distal, se_rhy = se_distal)
       if (mode == "constrained" || !is_degenerate(hsq)) {
         return(hsq |> mutate(status = "ok", reml_alg = alg,
                              message = if (length(messages)) paste(messages, collapse = " | ") else NA_character_))
@@ -112,7 +123,9 @@ run_reml <- function(grm_args, tissue, mpheno, mode) {
 # is full rank (M >> n), so its unconstrained estimate can validly exceed 1.
 is_degenerate <- function(hsq) {
   is.na(hsq$h2_local) || is.na(hsq$se_local) || hsq$se_local <= 0 || abs(hsq$h2_local) > 1 ||
-    (MODEL == "local_distal" && (is.na(hsq$se_distal) || hsq$se_distal <= 0))
+    (MODEL == "local_distal" && (is.na(hsq$se_distal) || hsq$se_distal <= 0)) ||
+    (MODEL == "local_rhythmic" && (is.na(hsq$h2_rhy) || is.na(hsq$se_rhy) || hsq$se_rhy <= 0 ||
+                                   abs(hsq$h2_rhy) > 1))
 }
 
 fit_gene <- function(g) {
@@ -122,17 +135,34 @@ fit_gene <- function(g) {
   local_grm <- file.path(tmp, "local")
   run_cmd(GCTA, c("--bfile", region_prefix(g$chr), "--extract", snplist, "--make-grm",
                   "--thread-num", THREADS, "--out", local_grm))
-  grm_args <- if (MODEL == "local_only") {
-    c("--grm", local_grm)
-  } else {
-    mgrm <- file.path(tmp, "local_distal.mgrm")
-    write_lines(c(local_grm, file.path(p$grm, paste0("loco_chr", g$chr))), mgrm)
+  grm_args <- switch(MODEL,
+    local_only = c("--grm", local_grm),
+    local_distal = {
+      mgrm <- file.path(tmp, "local_distal.mgrm")
+      write_lines(c(local_grm, file.path(p$grm, paste0("loco_chr", g$chr))), mgrm)
+      c("--mgrm", mgrm)
+    },
+    local_rhythmic = NULL,                       # tissue-specific, built below
+    stop("Unknown MODEL: ", MODEL)
+  )
+  if (MODEL == "local_rhythmic") K_all <- read_grm_bin(local_grm)
+  # Rhythmic model: K and K o T restricted to the tissue's donors (T depends on
+  # their phases), written as GCTA binary GRMs.
+  tissue_grm_args <- function(t) {
+    if (MODEL != "local_rhythmic") return(grm_args)
+    ph <- tissue_phase[[t]]
+    idx <- match(ph$iid, K_all$ids$iid)
+    K <- K_all$K[idx, idx]
+    write_grm_bin(file.path(tmp, "K_loc"), K, ph, n_snps = length(snps))
+    write_grm_bin(file.path(tmp, "K_rhy"), rhythmic_kernel(K, ph$phase, PHASE_PERIOD), ph, n_snps = length(snps))
+    mgrm <- file.path(tmp, "local_rhythmic.mgrm")
+    write_lines(file.path(tmp, c("K_loc", "K_rhy")), mgrm)
     c("--mgrm", mgrm)
   }
   todo <- filter(tissue_genes, gene_id == g$gene_id) |>
     tidyr::crossing(mode = REML_MODES)
   pmap(list(todo$tissue, todo$mpheno, todo$mode), \(t, k, m)
-    run_reml(grm_args, t, k, m) |> mutate(tissue = t, mode = m, .before = 1)) |>
+    run_reml(tissue_grm_args(t), t, k, m) |> mutate(tissue = t, mode = m, .before = 1)) |>
     list_rbind() |>
     mutate(gene_id = g$gene_id, gene_name = g$gene_name, chr = g$chr,
            n_snps_local = length(snps), model = MODEL, .after = tissue)

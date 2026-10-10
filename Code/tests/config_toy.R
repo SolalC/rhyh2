@@ -15,3 +15,5 @@ AUTOSOMES     <- 1:3
 N_CHUNKS      <- 4
 PERM_GENE_FRACTION <- 1
 MODEL         <- Sys.getenv("TOY_MODEL", "local_only")
+PHASE_FILE    <- file.path(TOY_DIR, "phase.RData")
+PHASE_PERIOD  <- 2 * pi

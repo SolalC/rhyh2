@@ -54,6 +54,11 @@ genes <- map(chrs, \(chr) {
          gene_name = sprintf("TOY%03d", row_number()),
          gene_type = if_else(row_number() %% 10 == 0, "lncRNA", "protein_coding"),
          h2_true = if_else(row_number() %% 2 == 0, runif(n(), 0.2, 0.6), 0))
+# Rhythmic toy (TOY_MODEL = local_rhythmic): every third gene gets a cis-genetic
+# rhythm, and all genes share a population rhythm. Otherwise no rhythm.
+rhythmic <- Sys.getenv("TOY_MODEL", "local_only") == "local_rhythmic"
+genes <- genes |>
+  mutate(h2_rhy_true = if (rhythmic) if_else(row_number() %% 3 == 0, runif(n(), 0.15, 0.35), 0) else 0)
 gtf_lines <- with(genes, sprintf(
   'chr%d\tHAVANA\tgene\t%d\t%d\t.\t+\t.\tgene_id "%s"; gene_type "%s"; gene_name "%s";',
   chr, start, end, gene_id, gene_type, gene_name))
@@ -68,13 +73,26 @@ local_genetic <- function(g) {
   gv <- scale(G[, causal, drop = FALSE]) %*% rnorm(length(causal))
   as.vector(scale(gv)) * sqrt(g$h2_true)
 }
+phase <- runif(n_donors, 0, 2 * pi)                         # inferred phase, radians
+phi <- setNames(phase, sub("^GTEX-", "", donors))           # CHIRAL-style names
+save(phi, file = file.path(out_dir, "phase.RData"))
+rhythm_genetic <- function(g) {
+  if (g$h2_rhy_true == 0) return(rep(0, n_donors))
+  idx <- which(snps$chr == g$chr & snps$pos >= g$start - 1e6 & snps$pos <= g$end + 1e6 & snps$maf > 0.05)
+  causal <- sample(idx, min(length(idx), 20))
+  ga <- as.vector(scale(scale(G[, causal, drop = FALSE]) %*% rnorm(length(causal))))
+  gb <- as.vector(scale(scale(G[, causal, drop = FALSE]) %*% rnorm(length(causal))))
+  sqrt(g$h2_rhy_true) * (ga * cos(phase) + gb * sin(phase))
+}
 factors <- matrix(rnorm(n_donors * n_factors), n_donors, n_factors)
 sex <- sample(1:2, n_donors, replace = TRUE)
 Y <- map(seq_len(nrow(genes)), \(i) {
   g <- genes[i, ]
   gv <- local_genetic(g)
   fx <- as.vector(factors %*% rnorm(n_factors, 0, 0.4))
-  gv + fx + 0.2 * (sex - 1.5) + rnorm(n_donors, 0, sqrt(1 - g$h2_true))
+  pop_rhythm <- if (rhythmic) 0.5 * cos(phase - 1) else 0
+  gv + rhythm_genetic(g) + pop_rhythm + fx + 0.2 * (sex - 1.5) +
+    rnorm(n_donors, 0, sqrt(1 - g$h2_true - g$h2_rhy_true))
 }) |> do.call(what = rbind)                                   # genes x donors
 colnames(Y) <- donors
 

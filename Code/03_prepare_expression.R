@@ -15,6 +15,10 @@ perm_seed <- if (is.null(args$`perm-seed`)) NA else as.integer(args$`perm-seed`)
 label <- run_label(perm_seed)
 p <- out_paths(OUT_DIR, label)
 
+if (MODEL == "local_rhythmic") {
+  phase <- load_phase()
+  message("Phase: ", length(phase), " donors from ", PHASE_FILE)
+}
 genes <- read_tsv(file.path(p$genes, "genes.tsv"), col_types = cols(chr = "c"), progress = FALSE)
 # Genotype IDs are WGS sample IDs (GTEX-XXXXX-0003); expression and covariates
 # use donor IDs (GTEX-XXXXX). Match on the donor ID, write the genotype ID.
@@ -47,6 +51,7 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
                       col_types = cols(.default = "d", ID = "c"), progress = FALSE)
 
   donors <- intersect(intersect(names(expr), genotyped), names(cov_raw))
+  if (MODEL == "local_rhythmic") donors <- intersect(donors, names(phase))
   if (length(donors) < MIN_SAMPLES) {
     message(tissue, ": n = ", length(donors), " < ", MIN_SAMPLES, ", skipped")
     return(tibble(tissue = tissue, n = length(donors), n_genes = 0L, status = "skipped_small_n"))
@@ -73,6 +78,12 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
     stop("Unknown COV_SOURCE: ", COV_SOURCE)
   )
   qcov <- if (N_GENO_PCS > 0) cbind(factors, get_rows(paste0("PC", seq_len(N_GENO_PCS)))) else factors
+  if (MODEL == "local_rhythmic") {
+    # Population rhythm as fixed effects, so the rhythmic random effect is the
+    # genetic deviation from the mean rhythm.
+    w <- 2 * pi / PHASE_PERIOD
+    qcov <- cbind(qcov, phase_cos = cos(w * phase[donors]), phase_sin = sin(w * phase[donors]))
+  }
   # Sex is dropped when constant or absent: GTEx omits the sex row for
   # single-sex tissues (ovary, testis, ...), and a constant column is collinear
   # with the intercept.
@@ -99,6 +110,12 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
     unlink(paste0(stem, ".covar"))
   }
   write_tsv(id_cols, paste0(stem, ".keep"), col_names = FALSE)
+  if (MODEL == "local_rhythmic") {
+    # Phase belongs to the expression sample, so it moves with expression (and
+    # covariates) when genotype labels are permuted.
+    bind_cols(id_cols, tibble(phase = phase[donors])) |>
+      write_tsv(paste0(stem, ".phase"), col_names = FALSE)
+  }
 
   message(tissue, ": n = ", length(donors), ", genes = ", nrow(y), " (", n_dropped, " not in genes.tsv)",
           ", quantitative covariates = ", ncol(qcov), ", sex = ", use_sex)

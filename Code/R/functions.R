@@ -32,8 +32,12 @@ parse_args <- function(args = commandArgs(trailingOnly = TRUE)) {
   setNames(as.list(kv[ok, 3]), kv[ok, 2])
 }
 
-run_label <- function(perm_seed = NA) {
-  if (is.na(perm_seed)) "observed" else paste0("perm", perm_seed)
+# Run label = output sub-folder for pheno/, results/ and summary/. Models other
+# than local_only get their own folder (e.g. local_rhythmic/observed), so runs of
+# different models never overwrite or skip each other's chunks.
+run_label <- function(perm_seed = NA, model = get0("MODEL", ifnotfound = "local_only")) {
+  base <- if (is.na(perm_seed)) "observed" else paste0("perm", perm_seed)
+  if (model == "local_only") base else file.path(model, base)
 }
 
 out_paths <- function(out_dir, label = "observed") {
@@ -130,6 +134,20 @@ normalise_tissue <- function(x) {
 }
 
 strip_version <- function(ensg) str_remove(ensg, "\\.\\d+$")
+
+# Inferred phase per donor (named numeric vector, names = full GTEx donor IDs)
+load_phase <- function() {
+  e <- new.env()
+  load(PHASE_FILE, envir = e)
+  phi <- e[[PHASE_OBJECT]]
+  if (!is.numeric(phi) || is.null(names(phi))) stop(PHASE_OBJECT, " in ", PHASE_FILE, " must be a named numeric vector")
+  names(phi) <- paste0(PHASE_ID_PREFIX, str_remove(names(phi), paste0("^", PHASE_ID_PREFIX)))
+  phi <- phi[!is.na(phi)]
+  if (any(phi < 0 | phi > PHASE_PERIOD)) {
+    warning(sum(phi < 0 | phi > PHASE_PERIOD), " phases outside [0, PHASE_PERIOD]; check PHASE_PERIOD units")
+  }
+  phi
+}
 
 # GTEx donor ID from a sample ID: "GTEX-1117F-0003" (WGS VCF) -> "GTEX-1117F".
 # Expression and covariate files use donor IDs; the WGS VCF uses sample IDs.

@@ -67,6 +67,24 @@ WGS SNPs vs HapMap II imputed SNPs, GTEx v10 vs 2014 processing and PEER factors
 bias (permutation null on real data not yet run). Checks to do: `--perm-seed` run and
 `SNP_KEEP_BED` (HapMap II) run.
 
+## Rhythmic model (`MODEL = "local_rhythmic"`, branch `rhythmic-cis-h2`)
+
+Isotropic cosinor random regression (PLAN.md §2.2). Per gene × tissue:
+y = Xβ + β₁ cos ωt + β₂ sin ωt + g_mes + g_rhy + e, with g_mes ~ N(0, σ²_mes K_local) and
+g_rhy ~ N(0, σ²_rhy K_local ∘ T), T_ij = cos ω(t_i − t_j), ω = 2π / `PHASE_PERIOD`.
+t is the inferred phase per donor (`PHASE_FILE`, CHIRAL by default). The population rhythm
+(cos/sin of phase) is a fixed effect, so g_rhy is the cis-genetic deviation of each donor's
+rhythm. Donors without a phase are dropped. Step 04 builds K and K ∘ T for each tissue's
+donors (`R/grm_io.R`) and fits `--mgrm` with `--reml-lrt 2` (LRT for σ²_rhy = 0). Step 05
+writes `per_tissue_rhythmic.tsv` (mean h²_mes, mean h²_rhy, chromosome-jackknife SEs, % FDR
+for the rhythmic test). Outputs go to `pheno|results|summary/local_rhythmic/<label>/`, so they
+never mix with local-only runs. `tests/rhythmic_kernel_check.R` checks the kernel against GCTA.
+
+Caveats: (1) the phase is inferred from the same expression data, so phase error attenuates
+h²_rhy and moves it into h²_mes or the residual; (2) GTEx PEER factors are learned from
+expression and may absorb rhythmic variation (side project: recompute PEER accounting for
+phase).
+
 ## Inputs (paths to set at the top of `config.R`)
 
 - `GTEX_RELEASE`: `"v10"` (sets the expression and covariate file names)

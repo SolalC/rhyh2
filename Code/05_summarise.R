@@ -69,6 +69,30 @@ per_tissue <- fits_ok |>
   arrange(mode, tissue) |>
   left_join(res |> group_by(tissue, mode) |> summarise(n_failed = sum(status != "ok"), .groups = "drop"),
             by = c("tissue", "mode"))
+if (MODEL == "local_rhythmic") {
+  # The LRT tests the rhythmic component here, so FDR counts belong to it.
+  per_tissue <- mutate(per_tissue, num_fdr = NA_real_, pct_fdr = NA_real_)
+  per_tissue_rhy <- fits_ok |>
+    filter(mode == "unconstrained", !is.na(h2_rhy)) |>
+    group_by(tissue) |>
+    mutate(fdr = p.adjust(p_lrt, method = "BH")) |>
+    summarise(
+      n_samples       = median(n),
+      n_genes         = n(),
+      mean_h2_mes     = mean(h2_local),
+      se_mes_jk       = jackknife_se(h2_local, chr),
+      mean_h2_rhy     = mean(h2_rhy),
+      se_rhy_naive    = sd(h2_rhy) / sqrt(n()),
+      se_rhy_jk       = jackknife_se(h2_rhy, chr),
+      median_h2_rhy   = median(h2_rhy),
+      num_fdr_rhy     = sum(fdr < FDR_LEVEL, na.rm = TRUE),
+      pct_fdr_rhy     = 100 * num_fdr_rhy / n_genes,
+      .groups = "drop"
+    )
+  write_tsv(per_tissue_rhy, file.path(p$summary, "per_tissue_rhythmic.tsv"))
+  message("Rhythmic model (unconstrained): mesor and rhythmic local h2 per tissue")
+  print(per_tissue_rhy, n = Inf, width = Inf)
+}
 write_tsv(per_tissue, file.path(p$summary, "per_tissue_h2.tsv"))
 print(per_tissue, n = Inf, width = Inf)
 
