@@ -1,0 +1,15 @@
+# Pipeline outputs contain individual-level GTEx data: never commit them.
+# OUT_DIR on Bunya is /scratch/user/uqschauq/rhyh2/wheeler2016 (inside this clone).
+wheeler2016/
+*.bed
+*.bim
+*.fam
+*.pgen
+*.pvar
+*.psam
+*.grm.*
+*.phen
+*.qcovar
+*.covar
+*.keep
+*.vcf.gz

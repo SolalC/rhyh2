@@ -1,0 +1,43 @@
+tissue_wheeler,n,mean_h2,se_perm,pct_fdr,num_fdr,num_expressed
+DGN Whole Blood,922,0.149,0.0039,58.8,7474,12719
+Cross-tissue,450,0.062,0.017,20.2,2995,14861
+Adipose - Subcutaneous,298,0.038,0.028,18.8,2666,14205
+Adrenal Gland,126,0.043,0.018,17.5,2479,14150
+Artery - Aorta,198,0.042,0.024,17.2,2385,13844
+Artery - Coronary,119,0.037,0.048,16.5,2326,14127
+Artery - Tibial,285,0.042,0.02,18.4,2489,13504
+Brain - Anterior cingulate cortex (BA24),72,0.028,0.036,15.4,2235,14515
+Brain - Caudate (basal ganglia),100,0.037,0.047,17.2,2521,14632
+Brain - Cerebellar Hemisphere,89,0.049,0.068,16.0,2294,14295
+Brain - Cerebellum,103,0.050,0.06,18.3,2646,14491
+Brain - Cortex,96,0.045,0.057,17.7,2593,14689
+Brain - Frontal Cortex (BA9),92,0.038,0.077,16.6,2416,14554
+Brain - Hippocampus,81,0.037,0.05,16.4,2376,14513
+Brain - Hypothalamus,81,0.017,0.043,15.2,2238,14759
+Brain - Nucleus accumbens (basal ganglia),93,0.029,0.04,17.1,2498,14601
+Brain - Putamen (basal ganglia),82,0.032,0.064,17.3,2495,14404
+Breast - Mammary Tissue,183,0.029,0.037,17.0,2496,14700
+Cells - EBV-transformed lymphocytes,115,0.058,0.1,16.6,2066,12454
+Cells - Transformed fibroblasts,272,0.051,0.031,20.0,2552,12756
+Colon - Sigmoid,124,0.033,0.019,16.0,2298,14321
+Colon - Transverse,170,0.036,0.058,16.3,2398,14676
+Esophagus - Gastroesophageal Junction,127,0.032,0.039,16.1,2270,14125
+Esophagus - Mucosa,242,0.042,0.03,17.1,2432,14239
+Esophagus - Muscularis,219,0.039,0.015,17.7,2493,14047
+Heart - Atrial Appendage,159,0.042,0.03,16.8,2327,13892
+Heart - Left Ventricle,190,0.034,0.034,16.5,2203,13321
+Liver,98,0.033,0.062,16.5,2230,13553
+Lung,279,0.032,0.034,17.0,2509,14775
+Muscle - Skeletal,361,0.033,0.03,17.9,2301,12833
+Nerve - Tibial,256,0.052,0.087,20.6,2992,14510
+Ovary,85,0.037,0.094,17.2,2418,14094
+Pancreas,150,0.047,0.024,17.2,2398,13941
+Pituitary,87,0.038,0.055,16.6,2527,15183
+Skin - Not Sun Exposed (Suprapubic),196,0.041,0.034,17.0,2490,14642
+Skin - Sun Exposed (Lower leg),303,0.039,0.016,18.4,2687,14625
+Small Intestine - Terminal Ileum,77,0.036,0.053,17.4,2591,14860
+Spleen,89,0.059,0.061,17.0,2451,14449
+Stomach,171,0.032,0.025,16.1,2338,14531
+Testis,157,0.054,0.044,17.8,3009,16936
+Thyroid,279,0.044,0.066,19.4,2838,14642
+Whole Blood,339,0.033,0.023,18.6,2260,12160
