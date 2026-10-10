@@ -53,6 +53,9 @@ REML_MODES    <- c("unconstrained", "constrained")  # means use unconstrained
 # Covariates: Wheeler used 15 PEER factors + sex, no genotype PCs.
 COV_SOURCE    <- "gtex_peer"    # "gtex_peer" = first N_FACTORS InferredCov
                                 # rows of the GTEx covariate file;
+                                # "peer_rhythm" = the same rows from PEER
+                                # re-run with cos/sin(phase) as known
+                                # covariates (peer/run_peer.R; see PEER_* below);
                                 # "expression_pcs" = top N_FACTORS PCs of the
                                 # normalised expression, computed here
 N_FACTORS     <- 15
@@ -72,6 +75,12 @@ PHASE_FILE      <- "/scratch/project_mnt/S0007/solal/circadian/Data/CHIRAL/DIP.R
 PHASE_OBJECT    <- "phi"
 PHASE_ID_PREFIX <- "GTEX-"
 PHASE_PERIOD    <- 2 * pi       # one cycle in the phase's units: 2*pi = radians, 24 = hours
+# PEER re-estimation (COV_SOURCE = "peer_rhythm"). PEER needs its own R 3.4:
+# install with peer/install_peer.sh, then point PEER_RSCRIPT at its Rscript.
+PEER_RSCRIPT    <- "/home/uqschauq/software/peer_env/bin/Rscript"
+PEER_COV_DIR    <- file.path(OUT_DIR, "peer_rhythm")   # <Tissue>.<release>.covariates.txt
+PEER_N_FACTORS  <- N_FACTORS    # must be >= N_FACTORS; factors are not nested in K
+PEER_MAX_ITER   <- 1000         # as GTEx
 # Permutation (negative control): run steps 03-05 with --perm-seed=<n>.
 # Genotype-to-sample labels are shuffled within tissue; expected mean h2 = 0.
 PERM_GENE_FRACTION <- 0.1       # fraction of genes analysed in permuted runs

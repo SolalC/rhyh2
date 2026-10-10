@@ -17,3 +17,6 @@ PERM_GENE_FRACTION <- 1
 MODEL         <- Sys.getenv("TOY_MODEL", "local_only")
 PHASE_FILE    <- file.path(TOY_DIR, "phase.RData")
 PHASE_PERIOD  <- 2 * pi
+COV_SOURCE    <- Sys.getenv("TOY_COV_SOURCE", "gtex_peer")
+PEER_RSCRIPT  <- Sys.getenv("PEER_RSCRIPT", "Rscript")
+PEER_COV_DIR  <- file.path(OUT_DIR, "peer_rhythm")

@@ -47,8 +47,13 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
   n_dropped <- nrow(expr_all) - nrow(expr)               # not in genes.tsv (other gene types,
   rm(expr_all)                                           # chrX, absent from GENE_GTF, 0 SNPs)
 
-  cov_raw <- read_tsv(file.path(GTEX_COV_DIR, paste0(tissue, ".", GTEX_RELEASE, ".covariates.txt")),
-                      col_types = cols(.default = "d", ID = "c"), progress = FALSE)
+  cov_dir <- if (COV_SOURCE == "peer_rhythm") PEER_COV_DIR else GTEX_COV_DIR
+  cov_file <- file.path(cov_dir, paste0(tissue, ".", GTEX_RELEASE, ".covariates.txt"))
+  if (!file.exists(cov_file)) {                      # e.g. PEER skipped the tissue (small n)
+    message(tissue, ": no covariate file ", cov_file, ", skipped")
+    return(tibble(tissue = tissue, n = NA_integer_, n_genes = 0L, status = "skipped_no_covariates"))
+  }
+  cov_raw <- read_tsv(cov_file, col_types = cols(.default = "d", ID = "c"), progress = FALSE)
 
   donors <- intersect(intersect(names(expr), genotyped), names(cov_raw))
   if (MODEL == "local_rhythmic") donors <- intersect(donors, names(phase))
@@ -70,7 +75,8 @@ prepare_tissue <- function(tissue, expr_file, tissue_index) {
     t(as.matrix(m[, donors])) |> `colnames<-`(ids)
   }
   factors <- switch(COV_SOURCE,
-    gtex_peer = get_rows(paste0("InferredCov", seq_len(N_FACTORS))),
+    gtex_peer = ,
+    peer_rhythm = get_rows(paste0("InferredCov", seq_len(N_FACTORS))),
     expression_pcs = {
       pcs <- prcomp(t(y), center = TRUE, scale. = TRUE, rank. = N_FACTORS)$x
       colnames(pcs) <- paste0("exprPC", seq_len(N_FACTORS)); pcs

@@ -35,9 +35,11 @@ parse_args <- function(args = commandArgs(trailingOnly = TRUE)) {
 # Run label = output sub-folder for pheno/, results/ and summary/. Models other
 # than local_only get their own folder (e.g. local_rhythmic/observed), so runs of
 # different models never overwrite or skip each other's chunks.
-run_label <- function(perm_seed = NA, model = get0("MODEL", ifnotfound = "local_only")) {
+run_label <- function(perm_seed = NA, model = get0("MODEL", ifnotfound = "local_only"),
+                      cov_source = get0("COV_SOURCE", ifnotfound = "gtex_peer")) {
   base <- if (is.na(perm_seed)) "observed" else paste0("perm", perm_seed)
-  if (model == "local_only") base else file.path(model, base)
+  do.call(file.path, as.list(c(if (model != "local_only") model,
+                               if (cov_source != "gtex_peer") cov_source, base)))
 }
 
 out_paths <- function(out_dir, label = "observed") {

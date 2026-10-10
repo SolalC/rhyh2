@@ -3,7 +3,9 @@ suppressPackageStartupMessages({ library(dplyr); library(readr) })
 toy <- commandArgs(trailingOnly = TRUE)[1]
 truth <- read_tsv(file.path(toy, "truth_genes.tsv"), show_col_types = FALSE)
 model <- Sys.getenv("TOY_MODEL", "local_only")
-lab <- function(x) if (model == "local_only") x else file.path(model, x)
+cov_source <- Sys.getenv("TOY_COV_SOURCE", "gtex_peer")
+lab <- function(x) do.call(file.path, as.list(c(if (model != "local_only") model,
+                                                if (cov_source != "gtex_peer") cov_source, x)))
 obs  <- read_tsv(file.path(toy, "out/summary", lab("observed"), "per_gene_h2.tsv.gz"), show_col_types = FALSE)
 perm <- read_tsv(file.path(toy, "out/summary", lab("perm1"), "per_gene_h2.tsv.gz"), show_col_types = FALSE)
 tissues <- read_tsv(file.path(toy, "out/pheno", lab("observed"), "tissues.tsv"), show_col_types = FALSE)
@@ -21,7 +23,8 @@ print(cmp); print(perm_mean)
 
 checks <- c(
   "only protein-coding genes analysed"   = all(obs$gene_id %in% truth$gene_id[truth$gene_type == "protein_coding"]),
-  "tissue with n < 70 skipped"           = tissues$status[tissues$tissue == "Tissue_TooSmall"] == "skipped_small_n",
+  "tissue with n < 70 skipped"           = tissues$status[tissues$tissue == "Tissue_TooSmall"] %in%
+                                           c("skipped_small_n", "skipped_no_covariates"),   # PEER skips it first
   "single-sex tissue runs without sex"   = tissues$status[tissues$tissue == "Tissue_OneSex"] == "ok" &&
                                            !tissues$sex_covariate[tissues$tissue == "Tissue_OneSex"],
   "all fits converged (local_only)"      = Sys.getenv("TOY_MODEL", "local_only") != "local_only" || all(obs$status == "ok"),

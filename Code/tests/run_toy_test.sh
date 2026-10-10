@@ -14,6 +14,12 @@ export RHYH2_CONFIG="$CODE_DIR/tests/config_toy.R"
 echo "== toy data in $TOY_DIR"
 Rscript "$CODE_DIR/tests/make_toy_data.R" "$TOY_DIR"
 
+# Optional PEER re-estimation (TOY_COV_SOURCE=peer_rhythm, PEER_RSCRIPT=<PEER's Rscript>)
+if [[ "${TOY_COV_SOURCE:-gtex_peer}" == peer_rhythm ]]; then
+  Rscript "$CODE_DIR/peer/export_phase.R"
+  for i in 1 2 3 4; do "$PEER_RSCRIPT" "$CODE_DIR/peer/run_peer.R" --tissue-index=$i > /dev/null; done
+fi
+
 Rscript "$CODE_DIR/01_prepare_genotypes.R"
 Rscript "$CODE_DIR/02_genes_and_grms.R"
 for label in observed perm; do

@@ -82,8 +82,33 @@ never mix with local-only runs. `tests/rhythmic_kernel_check.R` checks the kerne
 
 Caveats: (1) the phase is inferred from the same expression data, so phase error attenuates
 h²_rhy and moves it into h²_mes or the residual; (2) GTEx PEER factors are learned from
-expression and may absorb rhythmic variation (side project: recompute PEER accounting for
-phase).
+expression and may absorb rhythmic variation; see the next section.
+
+### PEER re-estimated with the phase (`COV_SOURCE = "peer_rhythm"`)
+
+`peer/run_peer.R` re-runs PEER per tissue with cos and sin of the phase as known covariates,
+so the hidden factors model the remaining structure. Settings follow GTEx (mean added,
+default priors, 1000 iterations); `PEER_N_FACTORS` factors (default `N_FACTORS`), ordered by
+relevance (increasing precision α). Output: GTEx-format covariate files in `PEER_COV_DIR`
+with the InferredCov rows replaced, and `<tissue>.peer_phase_r2.tsv` (R² of cos/sin of phase
+on the GTEx factors and on the new ones). Step 03 reads them when `COV_SOURCE = "peer_rhythm"`;
+outputs go to `…/local_rhythmic/peer_rhythm/<label>/`. In a simulation (n = 200, 4 latent
+factors plus a rhythm), PEER without the phase put the rhythm into its factors (R² 0.99 for
+cos and sin); with the phase as known covariates, the hidden factors were uncorrelated with it
+(|r| < 0.1) and still recovered the latent factors (R² > 0.99).
+
+PEER is unmaintained; the only working build is bioconda's `r-peer` 1.3 on R 3.4.1, so it
+runs in its own environment and `run_peer.R` is base R. Install once on a login node:
+
+```bash
+bash Code/peer/install_peer.sh          # -> $HOME/software/peer_env; set PEER_RSCRIPT in config.R
+cd Code/slurm && bash submit_all.sh --from=03 --peer   # with COV_SOURCE <- "peer_rhythm"
+```
+
+`slurm/00_peer.slurm` first writes the phase as text (`peer/export_phase.R`; R 3.4 cannot
+read `.RData` files saved by R ≥ 3.5), then runs one tissue per array task (array 1–60;
+tasks beyond the tissue count exit). Run time on GTEx-sized tissues is untested; the 24 h
+limit is a guess.
 
 ## Inputs (paths to set at the top of `config.R`)
 
