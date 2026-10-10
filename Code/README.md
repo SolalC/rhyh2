@@ -58,6 +58,15 @@ should leave it.
    a bias of this size matters: run the permutation control (`--perm-seed`) for every
    analysis and report the permuted mean alongside the observed one.
 
+### First GTEx v10 run (2026-10-10)
+
+Unconstrained mean local h² was higher than Wheeler Table 1 in all 40 matched tissues
+(median ratio 1.84, range 1.5–3.6; median excess +0.034; chromosome-jackknife SE ≈ 0.0015),
+while the tissue ranking agreed (Spearman ρ = 0.74). Not yet explained. Candidates: all common
+WGS SNPs vs HapMap II imputed SNPs, GTEx v10 vs 2014 processing and PEER factors, and method
+bias (permutation null on real data not yet run). Checks to do: `--perm-seed` run and
+`SNP_KEEP_BED` (HapMap II) run.
+
 ## Inputs (paths to set at the top of `config.R`)
 
 - `GTEX_RELEASE`: `"v10"` (sets the expression and covariate file names)
