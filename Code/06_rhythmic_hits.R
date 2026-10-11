@@ -32,8 +32,9 @@ CLOCK_GENES <- c("ARNTL", "BMAL1", "ARNTL2", "CLOCK", "NPAS2", "PER1", "PER2", "
 
 fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(chr = "c", message = "c"),
                  progress = FALSE) |>
-  filter(mode == "unconstrained", status == "ok", !is.na(h2_rhy), !is.na(lrt)) |>
-  mutate(p_rhy = rhythmic_p(h2_rhy, lrt), lrt_failed = is.na(p_rhy)) |>
+  filter(mode == "unconstrained", status == "ok", !is.na(h2_rhy)) |>
+  mutate(lrt_used = rhythmic_lrt(pick(everything())), p_rhy = rhythmic_p(h2_rhy, lrt_used),
+         lrt_failed = is.na(p_rhy)) |>
   group_by(tissue) |>
   mutate(fdr = p.adjust(p_rhy, method = "BH")) |>
   ungroup() |>
@@ -57,7 +58,7 @@ per_gene <- fits |>
 
 write_tsv(per_gene, file.path(p$summary, "rhythmic_hits_per_gene.tsv"))
 write_tsv(filter(fits, sig) |> select(tissue, gene_id, gene_name, chr, n, n_snps_local, h2_local, se_local,
-                                      h2_rhy, se_rhy, lrt, p_lrt, p_rhy, fdr, reml_alg, clock_gene),
+                                      h2_rhy, se_rhy, lrt, lrt_used, p_lrt, p_rhy, fdr, reml_alg, clock_gene),
           file.path(p$summary, "rhythmic_hits_per_fit.tsv"))
 write_tsv(calibration, file.path(p$summary, "rhythmic_calibration.tsv"))
 

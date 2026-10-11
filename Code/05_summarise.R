@@ -75,7 +75,7 @@ if (MODEL == "local_rhythmic") {
   per_tissue_rhy <- fits_ok |>
     filter(mode == "unconstrained", !is.na(h2_rhy)) |>
     group_by(tissue) |>
-    mutate(p_rhy = rhythmic_p(h2_rhy, lrt), fdr = p.adjust(p_rhy, method = "BH")) |>
+    mutate(p_rhy = rhythmic_p(h2_rhy, rhythmic_lrt(pick(everything()))), fdr = p.adjust(p_rhy, method = "BH")) |>
     summarise(
       n_samples       = median(n),
       n_genes         = n(),

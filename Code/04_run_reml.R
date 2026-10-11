@@ -85,7 +85,7 @@ if (MODEL == "local_rhythmic") {
 # |h2| > 1: with a rank-deficient local GRM, a positive-definite V requires
 # h2 < 1, so such values are not valid REML solutions (seen in ~0.5% of null
 # fits in testing, with values up to 11.6 that dominate a mean).
-run_reml <- function(grm_args, tissue, mpheno, mode) {
+run_reml <- function(grm_args, tissue, mpheno, mode, model = MODEL) {
   stem <- file.path(p$pheno, tissue)
   out <- file.path(tmp, "reml")
   messages <- character(0)
@@ -98,15 +98,15 @@ run_reml <- function(grm_args, tissue, mpheno, mode) {
       "--qcovar", paste0(stem, ".qcovar"),
       if (file.exists(paste0(stem, ".covar"))) c("--covar", paste0(stem, ".covar")),
       if (mode == "unconstrained") "--reml-no-constrain",
-      "--reml-alg", alg, "--reml-lrt", if (MODEL == "local_rhythmic") "2" else "1",
+      "--reml-alg", alg, "--reml-lrt", if (model == "local_rhythmic") "2" else "1",
       "--reml-maxit", REML_MAXIT,
       "--thread-num", THREADS, "--out", out
     )
     res <- run_cmd(GCTA, reml_args, allow_fail = TRUE)
     if (res$status == 0 && file.exists(paste0(out, ".hsq"))) {
       hsq <- read_hsq(paste0(out, ".hsq"))
-      if (MODEL == "local_rhythmic") hsq <- rename(hsq, h2_rhy = h2_distal, se_rhy = se_distal)
-      if (mode == "constrained" || !is_degenerate(hsq)) {
+      if (model == "local_rhythmic") hsq <- rename(hsq, h2_rhy = h2_distal, se_rhy = se_distal)
+      if (mode == "constrained" || !is_degenerate(hsq, model)) {
         return(hsq |> mutate(status = "ok", reml_alg = alg,
                              message = if (length(messages)) paste(messages, collapse = " | ") else NA_character_))
       }
@@ -121,10 +121,15 @@ run_reml <- function(grm_args, tissue, mpheno, mode) {
 
 # The |h2| > 1 bound applies to the local component only: the distal (LOCO) GRM
 # is full rank (M >> n), so its unconstrained estimate can validly exceed 1.
-is_degenerate <- function(hsq) {
-  is.na(hsq$h2_local) || is.na(hsq$se_local) || hsq$se_local <= 0 || abs(hsq$h2_local) > 1 ||
-    (MODEL == "local_distal" && (is.na(hsq$se_distal) || hsq$se_distal <= 0)) ||
-    (MODEL == "local_rhythmic" && (is.na(hsq$h2_rhy) || is.na(hsq$se_rhy) || hsq$se_rhy <= 0 ||
+# Rhythmic model: an SE below RHY_MIN_SE on either component also counts as
+# degenerate. K and K o T are partly collinear, and on GTEx v10 half of the
+# rhythmic hits were fits with h2_mes < 0 and an SE near 0 (down to 1e-6),
+# i.e. the two components trading off at a singular point, not a valid optimum.
+is_degenerate <- function(hsq, model = MODEL) {
+  min_se <- if (model == "local_rhythmic") RHY_MIN_SE else 0
+  is.na(hsq$h2_local) || is.na(hsq$se_local) || hsq$se_local <= min_se || abs(hsq$h2_local) > 1 ||
+    (model == "local_distal" && (is.na(hsq$se_distal) || hsq$se_distal <= 0)) ||
+    (model == "local_rhythmic" && (is.na(hsq$h2_rhy) || is.na(hsq$se_rhy) || hsq$se_rhy <= min_se ||
                                    abs(hsq$h2_rhy) > 1))
 }
 
@@ -161,8 +166,20 @@ fit_gene <- function(g) {
   }
   todo <- filter(tissue_genes, gene_id == g$gene_id) |>
     tidyr::crossing(mode = REML_MODES)
+  # Rhythmic model: the local-only model is also fitted on the same donors, and
+  # the LRT for the rhythmic component is computed from the two logL
+  # (lrt_own). GCTA's internal reduced fit gave LRTs inconsistent with the
+  # estimates on GTEx v10 (e.g. h2_rhy = 0.001 +/- 0.016 with LRT = 23).
+  fit_one <- function(t, k, m) {
+    full <- run_reml(tissue_grm_args(t), t, k, m)
+    if (MODEL != "local_rhythmic") return(full)
+    red <- run_reml(c("--grm", file.path(tmp, "K_loc")), t, k, m, model = "local_only")
+    logL_red <- if (red$status == "ok") red$logL else NA_real_
+    full |> mutate(logL_reduced = logL_red,
+                   lrt_own = if (status == "ok") 2 * (logL - logL_red) else NA_real_)
+  }
   pmap(list(todo$tissue, todo$mpheno, todo$mode), \(t, k, m)
-    run_reml(tissue_grm_args(t), t, k, m) |> mutate(tissue = t, mode = m, .before = 1)) |>
+    fit_one(t, k, m) |> mutate(tissue = t, mode = m, .before = 1)) |>
     list_rbind() |>
     mutate(gene_id = g$gene_id, gene_name = g$gene_name, chr = g$chr,
            n_snps_local = length(snps), model = MODEL, .after = tissue)

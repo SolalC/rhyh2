@@ -162,6 +162,7 @@ donor_id <- function(id) str_replace(id, "^(GTEX-[^-]+).*$", "\\1")
 # which doubles the false-positive rate (seen on GTEx v10: 11% of P < 0.05 in
 # every tissue). Signed-root version: p = P(Z > sign(h2) * sqrt(LRT)), uniform
 # under the null; identical to GCTA's P for positive estimates.
+# Pass lrt_own (step 04's own LRT from an explicit local-only fit) when present.
 # Fits with LRT > RHY_LRT_MAX are returned as NA: on GTEx v10 the LRT has a gap
 # between ~70 and ~4000, and the fits above it have small, imprecise h2_rhy, so
 # the reduced model most likely failed to converge rather than the effect being huge.
@@ -169,3 +170,7 @@ rhythmic_p <- function(h2_rhy, lrt, lrt_max = get0("RHY_LRT_MAX", ifnotfound = 1
   p <- pnorm(sign(h2_rhy) * sqrt(pmax(lrt, 0)), lower.tail = FALSE)
   if_else(lrt > lrt_max, NA_real_, p)
 }
+
+# The rhythmic LRT to use: step 04's own (lrt_own) when the results have it,
+# otherwise GCTA's.
+rhythmic_lrt <- function(fits) if ("lrt_own" %in% names(fits)) fits$lrt_own else fits$lrt
