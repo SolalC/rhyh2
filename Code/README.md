@@ -129,6 +129,7 @@ limit is a guess.
 | `03_prepare_expression.R` | Per-tissue phenotype, covariate and keep files (GCTA format) | `pheno/<label>/` |
 | `04_run_reml.R` | Per gene: local GRM (once), REML in each tissue × mode | `results/<label>/chunk_*.tsv` |
 | `05_summarise.R` | Combine, per-tissue means/SE/FDR, convergence, comparison with Table 1 and GenArchDB | `summary/<label>/` |
+| `06_rhythmic_hits.R` | Rhythmic model only: genes significant for h²_rhy per tissue and across tissues; LRT calibration per tissue | `summary/<label>/rhythmic_hits_per_gene.tsv`, `rhythmic_hits_per_fit.tsv`, `rhythmic_calibration.tsv` |
 
 `<label>` is `observed`, or `perm<seed>` for label-shuffled negative controls
 (`--perm-seed=<seed>` on steps 03–05; a random `PERM_GENE_FRACTION` of genes is used).
