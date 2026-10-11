@@ -106,4 +106,4 @@ diag_tab <- data.frame(tissue = tissue, n = length(donors), n_genes = ncol(Y), n
 write.table(diag_tab, file.path(PEER_COV_DIR, paste0(tissue, ".peer_phase_r2.tsv")),
             sep = "\t", quote = FALSE, row.names = FALSE)
 print(diag_tab)
-file.rename(paste0(out_file, ".partial"), out_file)
+invisible(file.rename(paste0(out_file, ".partial"), out_file))
