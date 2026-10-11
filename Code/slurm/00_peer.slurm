@@ -7,11 +7,11 @@
 #SBATCH --time=24:00:00
 #SBATCH --partition=general
 #SBATCH --account=a_imb_cpdg
-#SBATCH --array=1-60
+#SBATCH --array=1-50
 #SBATCH -o logs/%x_%A_%a.out
 #SBATCH -e logs/%x_%A_%a.err
 # Step 00 (optional): re-estimate PEER factors with cos/sin(phase) as known
-# covariates, one tissue per array task; tasks beyond the tissue count exit.
+# covariates, one tissue per array task (50 tissues in v10; tasks beyond the count exit).
 # Needs PEER_RSCRIPT in config.R (see ../peer/install_peer.sh). Used by step 03
 # when COV_SOURCE = "peer_rhythm". Time limit untested: check the largest tissue's log.
 set -euo pipefail

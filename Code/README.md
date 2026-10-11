@@ -106,7 +106,7 @@ cd Code/slurm && bash submit_all.sh --from=03 --peer   # with COV_SOURCE <- "pee
 ```
 
 `slurm/00_peer.slurm` first writes the phase as text (`peer/export_phase.R`; R 3.4 cannot
-read `.RData` files saved by R ≥ 3.5), then runs one tissue per array task (array 1–60;
+read `.RData` files saved by R ≥ 3.5), then runs one tissue per array task (array 1–50, the 50 v10 tissues;
 tasks beyond the tissue count exit). Run time on GTEx-sized tissues is untested; the 24 h
 limit is a guess.
 
