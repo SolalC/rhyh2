@@ -75,6 +75,8 @@ PHASE_FILE      <- "/scratch/project_mnt/S0007/solal/circadian/Data/CHIRAL/DIP.R
 PHASE_OBJECT    <- "phi"
 PHASE_ID_PREFIX <- "GTEX-"
 PHASE_PERIOD    <- 2 * pi       # one cycle in the phase's units: 2*pi = radians, 24 = hours
+RHY_LRT_MAX     <- 1000         # rhythmic LRTs above this are treated as failed fits
+                                # (see rhythmic_p() in R/functions.R)
 # PEER re-estimation (COV_SOURCE = "peer_rhythm"). PEER needs its own R 3.4:
 # install with peer/install_peer.sh, then point PEER_RSCRIPT at its Rscript.
 PEER_RSCRIPT    <- "/home/uqschauq/software/peer_env/bin/Rscript"

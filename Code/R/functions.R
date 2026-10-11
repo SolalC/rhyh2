@@ -154,3 +154,18 @@ load_phase <- function() {
 # GTEx donor ID from a sample ID: "GTEX-1117F-0003" (WGS VCF) -> "GTEX-1117F".
 # Expression and covariate files use donor IDs; the WGS VCF uses sample IDs.
 donor_id <- function(id) str_replace(id, "^(GTEX-[^-]+).*$", "\\1")
+
+# One-sided P-value for the rhythmic component of an unconstrained fit.
+# GCTA reports p = 0.5 * P(chi2_1 > LRT), the boundary-mixture P-value, which
+# assumes estimates constrained to >= 0. Unconstrained estimates are negative
+# half the time under the null, and GCTA gives those the same small P-values,
+# which doubles the false-positive rate (seen on GTEx v10: 11% of P < 0.05 in
+# every tissue). Signed-root version: p = P(Z > sign(h2) * sqrt(LRT)), uniform
+# under the null; identical to GCTA's P for positive estimates.
+# Fits with LRT > RHY_LRT_MAX are returned as NA: on GTEx v10 the LRT has a gap
+# between ~70 and ~4000, and the fits above it have small, imprecise h2_rhy, so
+# the reduced model most likely failed to converge rather than the effect being huge.
+rhythmic_p <- function(h2_rhy, lrt, lrt_max = get0("RHY_LRT_MAX", ifnotfound = 1000)) {
+  p <- pnorm(sign(h2_rhy) * sqrt(pmax(lrt, 0)), lower.tail = FALSE)
+  if_else(lrt > lrt_max, NA_real_, p)
+}
