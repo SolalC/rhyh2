@@ -17,8 +17,11 @@
 set -euo pipefail
 source "$SLURM_SUBMIT_DIR/common.sh"
 load_modules
-Rscript "$CODE_DIR/peer/export_phase.R"   # every task writes the same file; harmless
-PEER_RSCRIPT=$(Rscript -e 'source(Sys.getenv("RHYH2_CONFIG")); cat(PEER_RSCRIPT, "\n", sep = "")' | tail -n 1)
+# export_phase.R also writes PEER_RSCRIPT from the config to a file: capturing
+# Rscript's stdout with $(...) returned nothing under Bunya's R module.
+path_file="$SLURM_SUBMIT_DIR/logs/peer_rscript_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+Rscript "$CODE_DIR/peer/export_phase.R" "$path_file"
+PEER_RSCRIPT=$(cat "$path_file"); rm -f "$path_file"
 if [[ ! -x "$PEER_RSCRIPT" ]]; then
   echo "PEER_RSCRIPT from $RHYH2_CONFIG is '$PEER_RSCRIPT', not an executable. Set it in config.R" \
        "to <env_dir>/bin/Rscript (see ../peer/install_peer.sh)." >&2
