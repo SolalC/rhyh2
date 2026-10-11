@@ -18,6 +18,12 @@ set -euo pipefail
 source "$SLURM_SUBMIT_DIR/common.sh"
 load_modules
 Rscript "$CODE_DIR/peer/export_phase.R"   # every task writes the same file; harmless
-PEER_RSCRIPT=$(Rscript -e 'source(Sys.getenv("RHYH2_CONFIG")); cat(PEER_RSCRIPT)')
+PEER_RSCRIPT=$(Rscript -e 'source(Sys.getenv("RHYH2_CONFIG")); cat(PEER_RSCRIPT, "\n", sep = "")' | tail -n 1)
+if [[ ! -x "$PEER_RSCRIPT" ]]; then
+  echo "PEER_RSCRIPT from $RHYH2_CONFIG is '$PEER_RSCRIPT', not an executable. Set it in config.R" \
+       "to <env_dir>/bin/Rscript (see ../peer/install_peer.sh)." >&2
+  exit 1
+fi
+echo "PEER Rscript: $PEER_RSCRIPT" >&2
 module purge                           # PEER's R 3.4 must not see R 4.4's libraries
 "$PEER_RSCRIPT" "$CODE_DIR/peer/run_peer.R" --tissue-index="$SLURM_ARRAY_TASK_ID"
