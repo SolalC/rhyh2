@@ -130,6 +130,7 @@ limit is a guess.
 | `04_run_reml.R` | Per gene: local GRM (once), REML in each tissue × mode | `results/<label>/chunk_*.tsv` |
 | `05_summarise.R` | Combine, per-tissue means/SE/FDR, convergence, comparison with Table 1 and GenArchDB | `summary/<label>/` |
 | `06_rhythmic_hits.R` | Rhythmic model only: genes significant for h²_rhy per tissue and across tissues; LRT calibration per tissue | `summary/<label>/rhythmic_hits_per_gene.tsv`, `rhythmic_hits_per_fit.tsv`, `rhythmic_calibration.tsv` |
+| `07_plot_components.R` | Rhythmic model only: per tissue, σ²_mesor against σ²_rhy, one point per gene with SEs on both axes, rhythmic hits in colour (falls back to h² for results from before step 04 stored σ²) | `summary/<label>/components/<tissue>.png`, `components_all_tissues.pdf` |
 
 `<label>` is `observed`, or `perm<seed>` for label-shuffled negative controls
 (`--perm-seed=<seed>` on steps 03–05; a random `PERM_GENE_FRACTION` of genes is used).

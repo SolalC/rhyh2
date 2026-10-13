@@ -113,6 +113,11 @@ read_hsq <- function(file) {
     h2_local     = get("V(G1)/Vp"), se_local  = get("V(G1)/Vp", 3),
     h2_distal    = get("V(G2)/Vp"), se_distal = get("V(G2)/Vp", 3),
     h2_single    = get("V(G)/Vp"),  se_single = get("V(G)/Vp", 3),
+    # variance components on the expression scale (G1 local, G2 distal or rhythmic)
+    var_g1       = coalesce(get("V(G1)"), get("V(G)")),
+    se_var_g1    = coalesce(get("V(G1)", 3), get("V(G)", 3)),
+    var_g2       = get("V(G2)"),    se_var_g2 = get("V(G2)", 3),
+    var_e        = get("V(e)"),     se_var_e  = get("V(e)", 3),
     vp           = get("Vp"),
     logL         = get("logL"),
     lrt          = get("LRT"),
