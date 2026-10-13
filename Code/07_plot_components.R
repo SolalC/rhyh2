@@ -7,6 +7,11 @@
 #   Axes: sigma2_mesor = V(G1) and sigma2_rhy = V(G2) from GCTA, when step 04
 #   stored them (runs after this script was added). Older results only have the
 #   heritabilities, so h2 = sigma2 / Vp is plotted instead and the axes say so.
+#   Black line: OLS regression of y on x over all genes in the tissue (with 95%
+#   CI), slope and correlation in the subtitle. Descriptive only: it ignores the
+#   SEs, and the two estimates of a gene can share sampling error (K and K o T
+#   are partly collinear, so they can trade off), which can bias the slope even
+#   under the null; compare with the permutation plot.
 #   Genes significant for the rhythmic component (BH FDR < FDR_LEVEL within
 #   tissue, P from rhythmic_p() as in step 06) are drawn on top in colour.
 #
@@ -51,17 +56,20 @@ cols <- setNames(c("grey65", "#2a78d6"), levels(fits$group))
 plot_tissue <- function(d) {
   d <- arrange(d, group)                     # significant genes drawn last, on top
   n_sig <- sum(d$group == levels(d$group)[2])
+  fit <- lm(y ~ x, data = d)                 # OLS over all genes, ignoring the SEs
   ggplot(d, aes(x, y, colour = group)) +
     geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
     geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
     geom_errorbar(aes(ymin = y - y_se, ymax = y + y_se), width = 0, linewidth = 0.2, alpha = 0.25) +
     geom_errorbar(aes(xmin = x - x_se, xmax = x + x_se), orientation = "y", width = 0, linewidth = 0.2, alpha = 0.25) +
     geom_point(size = 0.8, alpha = 0.6) +
+    geom_smooth(aes(group = 1), method = "lm", formula = y ~ x, colour = "black", linewidth = 0.6, se = TRUE) +
     scale_colour_manual(values = cols, drop = FALSE, name = NULL) +
     labs(x = x_lab, y = y_lab, title = gsub("_", " ", d$tissue[1]),
-         subtitle = sprintf("n = %d donors, %d genes, %d rhythmic at FDR < %g%s",
+         subtitle = sprintf("n = %d donors, %d genes, %d rhythmic at FDR < %g%s\nOLS slope = %.3f (SE %.3f), r = %.2f",
                             median(d$n), nrow(d), n_sig, FDR_LEVEL,
-                            if (is.na(perm_seed)) "" else sprintf(" (permutation %d)", perm_seed))) +
+                            if (is.na(perm_seed)) "" else sprintf(" (permutation %d)", perm_seed),
+                            coef(fit)[2], sqrt(vcov(fit)[2, 2]), cor(d$x, d$y))) +
     theme_bw(base_size = 11) +
     theme(legend.position = "top", panel.grid.minor = element_blank())
 }
