@@ -4,9 +4,9 @@
 #   Writes to summary/<label>/components/:
 #     <tissue>.png                 one plot per tissue
 #     components_all_tissues.pdf   the same plots, one page per tissue
-#   Axes: sigma2_mesor = V(G1) and sigma2_rhy = V(G2) from GCTA, when step 04
-#   stored them (runs after this script was added). Older results only have the
-#   heritabilities, so h2 = sigma2 / Vp is plotted instead and the axes say so.
+#   Axes: h2_mesor and h2_rhy (sigma2 / Vp). With --scale=var, the variance
+#   components V(G1) and V(G2) instead, if step 04 stored them (runs after
+#   commit e40a2dd); otherwise it falls back to h2 with a message.
 #   Black line: OLS regression of y on x over all genes in the tissue (with 95%
 #   CI), slope and correlation in the subtitle. Descriptive only: it ignores the
 #   SEs, and the two estimates of a gene can share sampling error (K and K o T
@@ -15,7 +15,7 @@
 #   Genes significant for the rhythmic component (BH FDR < FDR_LEVEL within
 #   tissue, P from rhythmic_p() as in step 06) are drawn on top in colour.
 #
-# Usage: Rscript 07_plot_components.R [--perm-seed=<n>]
+# Usage: Rscript 07_plot_components.R [--perm-seed=<n>] [--scale=h2|var]
 
 source(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])), "R", "functions.R"))
 suppressPackageStartupMessages(library(ggplot2))
@@ -33,8 +33,10 @@ fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(ch
   filter(mode == "unconstrained", status == "ok", !is.na(h2_rhy))
 lrt <- if ("lrt_own" %in% names(fits)) coalesce(fits$lrt_own, fits$lrt) else fits$lrt
 
-# Variance components if step 04 stored them, otherwise heritabilities
-use_var <- all(c("var_g1", "var_g2") %in% names(fits)) && all(!is.na(fits$var_g2))   # all, so a run mixing old and new chunks is not silently subset
+# Heritabilities by default; variance components on request, if every fit has
+# them (so a run mixing old and new chunks is not silently subset)
+want_var <- identical(args$scale, "var")
+use_var <- want_var && all(c("var_g1", "var_g2") %in% names(fits)) && all(!is.na(fits$var_g2))
 fits <- fits |>
   mutate(p_rhy = rhythmic_p(h2_rhy, lrt),
          x = if (use_var) var_g1 else h2_local, x_se = if (use_var) se_var_g1 else se_local,
@@ -48,7 +50,7 @@ fits <- fits |>
 if (FDR_LEVEL != 0.05) levels(fits$group)[2] <- paste0("Rhythmic FDR < ", FDR_LEVEL)
 x_lab <- if (use_var) quote(sigma^2 ~ mesor) else quote(h^2 ~ mesor ~ (sigma^2 ~ mesor / V[P]))
 y_lab <- if (use_var) quote(sigma^2 ~ rhythmic) else quote(h^2 ~ rhythmic ~ (sigma^2 ~ rhythmic / V[P]))
-if (!use_var) message("No variance components for some or all fits (step 04 run before they were stored): ",
+if (want_var && !use_var) message("No variance components for some or all fits (step 04 run before they were stored): ",
                       "plotting h2 = sigma2 / Vp. Expression is normalised per gene, so Vp is close to ",
                       "the residual variance after covariates.")
 
