@@ -69,6 +69,10 @@ walk(unique(my_genes$chr), \(chr) {
 })
 region_bim <- map(set_names(unique(my_genes$chr)), \(chr) read_bim(region_prefix(chr)))
 
+if (REML_ENGINE == "mph") {
+  if (MODEL != "local_rhythmic") stop("REML_ENGINE = \"mph\" is implemented for MODEL = \"local_rhythmic\" only")
+  source(file.path(code_dir(), "R", "mph.R"))
+}
 if (MODEL == "local_rhythmic") {
   source(file.path(code_dir(), "R", "grm_io.R"))
   tissue_phase <- map(set_names(tissues$tissue), \(t)
@@ -86,6 +90,8 @@ if (MODEL == "local_rhythmic") {
 # h2 < 1, so such values are not valid REML solutions (seen in ~0.5% of null
 # fits in testing, with values up to 11.6 that dominate a mean).
 run_reml <- function(grm_args, tissue, mpheno, mode) {
+  force(grm_args)                # writes the tissue's kernels (lazy argument)
+  if (REML_ENGINE == "mph") return(run_reml_mph(tissue, mpheno, mode, tmp))
   stem <- file.path(p$pheno, tissue)
   out <- file.path(tmp, "reml")
   messages <- character(0)
@@ -154,7 +160,12 @@ fit_gene <- function(g) {
     idx <- match(ph$iid, K_all$ids$iid)
     K <- K_all$K[idx, idx]
     write_grm_bin(file.path(tmp, "K_loc"), K, ph, n_snps = length(snps))
-    write_grm_bin(file.path(tmp, "K_rhy"), rhythmic_kernel(K, ph$phase, PHASE_PERIOD), ph, n_snps = length(snps))
+    KT <- rhythmic_kernel(K, ph$phase, PHASE_PERIOD)
+    write_grm_bin(file.path(tmp, "K_rhy"), KT, ph, n_snps = length(snps))
+    if (REML_ENGINE == "mph") {
+      write_grm_mph(file.path(tmp, "mph_K_loc"), K, ph$iid)
+      write_grm_mph(file.path(tmp, "mph_K_rhy"), KT, ph$iid)
+    }
     mgrm <- file.path(tmp, "local_rhythmic.mgrm")
     write_lines(file.path(tmp, c("K_loc", "K_rhy")), mgrm)
     c("--mgrm", mgrm)

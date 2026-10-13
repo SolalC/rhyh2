@@ -20,3 +20,5 @@ PHASE_PERIOD  <- 2 * pi
 COV_SOURCE    <- Sys.getenv("TOY_COV_SOURCE", "gtex_peer")
 PEER_RSCRIPT  <- Sys.getenv("PEER_RSCRIPT", "Rscript")
 PEER_COV_DIR  <- file.path(OUT_DIR, "peer_rhythm")
+REML_ENGINE   <- Sys.getenv("TOY_REML_ENGINE", "gcta")
+MPH           <- Sys.getenv("MPH", "mph")

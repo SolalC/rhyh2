@@ -4,8 +4,10 @@ toy <- commandArgs(trailingOnly = TRUE)[1]
 truth <- read_tsv(file.path(toy, "truth_genes.tsv"), show_col_types = FALSE)
 model <- Sys.getenv("TOY_MODEL", "local_only")
 cov_source <- Sys.getenv("TOY_COV_SOURCE", "gtex_peer")
+engine <- Sys.getenv("TOY_REML_ENGINE", "gcta")
 lab <- function(x) do.call(file.path, as.list(c(if (model != "local_only") model,
-                                                if (cov_source != "gtex_peer") cov_source, x)))
+                                                if (cov_source != "gtex_peer") cov_source,
+                                                if (engine != "gcta") engine, x)))
 obs  <- read_tsv(file.path(toy, "out/summary", lab("observed"), "per_gene_h2.tsv.gz"), show_col_types = FALSE)
 perm <- read_tsv(file.path(toy, "out/summary", lab("perm1"), "per_gene_h2.tsv.gz"), show_col_types = FALSE)
 tissues <- read_tsv(file.path(toy, "out/pheno", lab("observed"), "tissues.tsv"), show_col_types = FALSE)

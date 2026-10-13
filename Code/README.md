@@ -110,6 +110,36 @@ read `.RData` files saved by R ≥ 3.5), then runs one tissue per array task (ar
 tasks beyond the tissue count exit). Run time on GTEx-sized tissues is untested; the 24 h
 limit is a guess.
 
+### MPH as the REML engine (`REML_ENGINE = "mph"`, branch `rhythmic-mph`)
+
+[MPH](https://jiang18.github.io/mph/) (Jiang 2024, *Bioinformatics* 40:btae298) fits the
+same REML model with Fisher scoring and stochastic trace estimates (`MPH_RANDOM_VECTORS`
+random vectors), in single precision; its log-likelihood is exact. `R/mph.R` writes K and
+K∘T in MPH's binary format, converts each tissue's phenotype and covariate files to CSV
+(intercept, quantitative covariates, 0/1 dummies for sex), and runs the full model and the
+local-only model, so the LRT is 2 × (logL_full − logL_reduced) (also stored as `lrt_own`).
+
+- Rhythmic model only, unconstrained only (MPH has no constrained mode; constrained rows
+  are written with status `skipped`). Estimates may be negative, as with GCTA's `--reml-no-constrain`.
+- Results go to `<model>/<cov_source>/mph/<observed|permN>`, next to GCTA's, so both can be
+  compared; steps 03–07 must be run with the same `REML_ENGINE`.
+- Same degeneracy rule as for GCTA (`is_degenerate()`); `cov_var_g12` holds the sampling
+  covariance of the two genetic variance components.
+
+Toy data (n = 150–450, 108 genes × 3 tissues): per-gene correlation with GCTA r ≥ 0.995
+(h²_mesor) and ≥ 0.994 (h²_rhy), median absolute difference ≤ 0.018, LRT r = 1.00, identical
+P < 0.05 calls (50/322); MPH converged in 2 fits where GCTA failed. REML time at n = 450,
+one thread: 0.15 s per gene (full + reduced) vs 0.37 s for GCTA (full with `--reml-lrt`).
+
+Building MPH (the official Makefile assumes the Intel compiler); tested here with g++,
+Eigen 3 and MKL:
+
+```bash
+git clone https://github.com/jiang18/mph.git && cd mph && mkdir -p build
+for f in src/*.cpp; do g++ -O3 -fopenmp -std=c++11 -I<eigen3 include dir> -I<mkl include dir> -c $f -o build/$(basename $f .cpp).o; done
+g++ -fopenmp build/*.o -o build/mph -L<mkl lib dir> -lmkl_rt -lpthread -lm -ldl
+```
+
 ## Inputs (paths to set at the top of `config.R`)
 
 - `GTEX_RELEASE`: `"v10"` (sets the expression and covariate file names)

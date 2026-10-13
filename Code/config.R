@@ -66,6 +66,14 @@ REML_ALGS     <- c(0, 1, 2)     # retry order: AI (GCTA default), Fisher
                                 # scoring, EM. c(0) = GCTA default only
 N_CHUNKS      <- 200            # SLURM array size for step 04
 THREADS       <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
+
+# REML engine for step 04: "gcta" (default) or "mph" (MPH, rhythmic model only,
+# unconstrained fits only; results go to a separate <label>/mph folder so they
+# can be compared with GCTA's). MPH estimates traces from random vectors.
+REML_ENGINE        <- "gcta"
+MPH                <- "/home/uqschauq/software/mph"
+MPH_MAXIT          <- 50
+MPH_RANDOM_VECTORS <- 100   # MPH default; more = less Monte Carlo noise, slower
 FDR_LEVEL     <- 0.1
 SEED          <- 20261008
 # Rhythmic model (MODEL = "local_rhythmic"): inferred circadian phase per donor.

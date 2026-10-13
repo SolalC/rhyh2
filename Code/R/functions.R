@@ -36,10 +36,12 @@ parse_args <- function(args = commandArgs(trailingOnly = TRUE)) {
 # than local_only get their own folder (e.g. local_rhythmic/observed), so runs of
 # different models never overwrite or skip each other's chunks.
 run_label <- function(perm_seed = NA, model = get0("MODEL", ifnotfound = "local_only"),
-                      cov_source = get0("COV_SOURCE", ifnotfound = "gtex_peer")) {
+                      cov_source = get0("COV_SOURCE", ifnotfound = "gtex_peer"),
+                      engine = get0("REML_ENGINE", ifnotfound = "gcta")) {
   base <- if (is.na(perm_seed)) "observed" else paste0("perm", perm_seed)
   do.call(file.path, as.list(c(if (model != "local_only") model,
-                               if (cov_source != "gtex_peer") cov_source, base)))
+                               if (cov_source != "gtex_peer") cov_source,
+                               if (engine != "gcta") engine, base)))
 }
 
 out_paths <- function(out_dir, label = "observed") {
