@@ -125,6 +125,9 @@ local-only model, so the LRT is 2 × (logL_full − logL_reduced) (also stored a
   compared; steps 03–07 must be run with the same `REML_ENGINE`.
 - Same degeneracy rule as for GCTA (`is_degenerate()`); `cov_var_g12` holds the sampling
   covariance of the two genetic variance components.
+- `compare_engines.R [--perm-seed=<n>]` compares the two runs per tissue (fits ok in each,
+  correlations and median differences of h², SEs and LRT, agreement of P < 0.05 calls) and
+  writes `summary/<label>/mph/.../engine_comparison.tsv`.
 
 Toy data (n = 150–450, 108 genes × 3 tissues): per-gene correlation with GCTA r ≥ 0.995
 (h²_mesor) and ≥ 0.994 (h²_rhy), median absolute difference ≤ 0.018, LRT r = 1.00, identical
