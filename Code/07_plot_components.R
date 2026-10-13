@@ -29,7 +29,7 @@ fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(ch
 lrt <- if ("lrt_own" %in% names(fits)) coalesce(fits$lrt_own, fits$lrt) else fits$lrt
 
 # Variance components if step 04 stored them, otherwise heritabilities
-use_var <- all(c("var_g1", "var_g2") %in% names(fits)) && any(!is.na(fits$var_g2))
+use_var <- all(c("var_g1", "var_g2") %in% names(fits)) && all(!is.na(fits$var_g2))   # all, so a run mixing old and new chunks is not silently subset
 fits <- fits |>
   mutate(p_rhy = rhythmic_p(h2_rhy, lrt),
          x = if (use_var) var_g1 else h2_local, x_se = if (use_var) se_var_g1 else se_local,
@@ -43,7 +43,7 @@ fits <- fits |>
 if (FDR_LEVEL != 0.05) levels(fits$group)[2] <- paste0("Rhythmic FDR < ", FDR_LEVEL)
 x_lab <- if (use_var) quote(sigma^2 ~ mesor) else quote(h^2 ~ mesor ~ (sigma^2 ~ mesor / V[P]))
 y_lab <- if (use_var) quote(sigma^2 ~ rhythmic) else quote(h^2 ~ rhythmic ~ (sigma^2 ~ rhythmic / V[P]))
-if (!use_var) message("No variance components in these results (step 04 run before they were stored): ",
+if (!use_var) message("No variance components for some or all fits (step 04 run before they were stored): ",
                       "plotting h2 = sigma2 / Vp. Expression is normalised per gene, so Vp is close to ",
                       "the residual variance after covariates.")
 
