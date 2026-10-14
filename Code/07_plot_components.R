@@ -1,6 +1,7 @@
 # Step 07 (rhythmic model) — per tissue, the mesor against the rhythmic variance
 # component, one point per gene with its SE on both axes.
-#   Reads summary/<label>/per_gene_h2.tsv.gz (step 05), unconstrained fits.
+#   Reads summary/<label>/per_gene_h2.tsv.gz (step 05), unconstrained fits that
+#   succeeded: status "ok", a usable LRT (p_rhy not NA) and, for MPH, converged.
 #   Writes to summary/<label>/components/:
 #     <tissue>.png                 one plot per tissue
 #     components_all_tissues.pdf   the same plots, one page per tissue
@@ -42,16 +43,21 @@ lrt <- if ("lrt_own" %in% names(fits)) coalesce(fits$lrt_own, fits$lrt) else fit
 # them (so a run mixing old and new chunks is not silently subset)
 want_var <- identical(args$scale, "var")
 use_var <- want_var && all(c("var_g1", "var_g2") %in% names(fits)) && all(!is.na(fits$var_g2))
+n_ok <- nrow(fits)
 fits <- fits |>
   mutate(p_rhy = rhythmic_p(h2_rhy, lrt),
+         converged = is.na(message) | !str_detect(message, "reached --num_iterations"),
          x = if (use_var) var_g1 else h2_local, x_se = if (use_var) se_var_g1 else se_local,
          y = if (use_var) var_g2 else h2_rhy,   y_se = if (use_var) se_var_g2 else se_rhy) |>
-  filter(!is.na(x), !is.na(y)) |>
+  # drop failed fits: no LRT or LRT > RHY_LRT_MAX (p_rhy NA; see rhythmic_p())
+  # and MPH fits that hit the iteration limit
+  filter(!is.na(x), !is.na(y), !is.na(p_rhy), converged) |>
   group_by(tissue) |>
   mutate(fdr = p.adjust(p_rhy, method = "BH")) |>
   ungroup() |>
   mutate(group = if_else(!is.na(fdr) & fdr < FDR_LEVEL, "Rhythmic FDR < 0.05", "Not significant") |>
            factor(levels = c("Not significant", "Rhythmic FDR < 0.05")))
+message(n_ok - nrow(fits), " of ", n_ok, " ok fits dropped (no usable LRT or not converged)")
 if (FDR_LEVEL != 0.05) levels(fits$group)[2] <- paste0("Rhythmic FDR < ", FDR_LEVEL)
 x_lab <- if (use_var) quote(sigma^2 ~ mesor) else quote(h^2 ~ mesor ~ (sigma^2 ~ mesor / V[P]))
 y_lab <- if (use_var) quote(sigma^2 ~ rhythmic) else quote(h^2 ~ rhythmic ~ (sigma^2 ~ rhythmic / V[P]))
