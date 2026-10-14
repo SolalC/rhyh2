@@ -27,7 +27,7 @@ res <- map(chunk_files, \(f) read_tsv(f, col_types = cols(chr = "c", message = "
 if (nrow(res) == 0) stop("No results in ", p$results)
 write_tsv(res, file.path(p$summary, "per_gene_h2.tsv.gz"))
 
-fits_ok <- filter(res, status == "ok", !is.na(h2_local))
+fits_ok <- filter(res, usable_fit(res))   # failed fits never enter any summary
 # Convergence report: failures are not random (they concentrate at h2 near 0),
 # so a high failure rate biases the mean of the remaining estimates.
 convergence <- res |>
@@ -67,7 +67,7 @@ per_tissue <- fits_ok |>
   mutate(across(c(num_fdr, pct_fdr), \(x) if_else(mode == "unconstrained", as.numeric(x), NA_real_)),
          pct_at_bound = if_else(mode == "constrained", pct_at_bound, NA_real_)) |>
   arrange(mode, tissue) |>
-  left_join(res |> group_by(tissue, mode) |> summarise(n_failed = sum(status != "ok"), .groups = "drop"),
+  left_join(res |> group_by(tissue, mode) |> summarise(n_failed = sum(!usable_fit(pick(everything()))), .groups = "drop"),
             by = c("tissue", "mode"))
 if (MODEL == "local_rhythmic") {
   # The LRT tests the rhythmic component here, so FDR counts belong to it.
@@ -75,11 +75,11 @@ if (MODEL == "local_rhythmic") {
   per_tissue_rhy <- fits_ok |>
     filter(mode == "unconstrained", !is.na(h2_rhy)) |>
     group_by(tissue) |>
-    mutate(p_rhy = rhythmic_p(h2_rhy, lrt), fdr = p.adjust(p_rhy, method = "BH")) |>
+    mutate(p_rhy = rhythmic_p(h2_rhy, if ("lrt_own" %in% names(pick(everything()))) coalesce(lrt_own, lrt) else lrt),
+           fdr = p.adjust(p_rhy, method = "BH")) |>
     summarise(
       n_samples       = median(n),
       n_genes         = n(),
-      n_lrt_failed    = sum(is.na(p_rhy)),
       mean_h2_mes     = mean(h2_local),
       se_mes_jk       = jackknife_se(h2_local, chr),
       mean_h2_rhy     = mean(h2_rhy),
