@@ -180,7 +180,15 @@ fit_gene <- function(g) {
 }
 
 t0 <- Sys.time()
-res <- map(seq_len(nrow(my_genes)), \(i) fit_gene(my_genes[i, ]), .progress = interactive()) |>
+# one log line per gene (time, SNPs) so a slow chunk can be traced from its .err log
+res <- map(seq_len(nrow(my_genes)), \(i) {
+  t_g <- Sys.time()
+  out <- fit_gene(my_genes[i, ])
+  message(format(Sys.time(), "%H:%M:%S"), " gene ", i, "/", nrow(my_genes), " ", my_genes$gene_id[i], ": ",
+          out$n_snps_local[1], " SNPs, ", nrow(out), " fits, ",
+          round(as.numeric(difftime(Sys.time(), t_g, units = "secs"))), " s")
+  out
+}) |>
   list_rbind()
 message("Chunk ", chunk, ": ", nrow(res), " fits, ", sum(res$status == "failed"), " failed, ",
         sum(res$status == "skipped"), " skipped (MPH has no constrained mode), ",
