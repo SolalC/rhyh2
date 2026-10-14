@@ -163,7 +163,7 @@ g++ -fopenmp build/*.o -o build/mph -L<mkl lib dir> -lmkl_rt -lpthread -lm -ldl
 | `04_run_reml.R` | Per gene: local GRM (once), REML in each tissue × mode | `results/<label>/chunk_*.tsv` |
 | `05_summarise.R` | Combine, per-tissue means/SE/FDR, convergence, comparison with Table 1 and GenArchDB | `summary/<label>/` |
 | `06_rhythmic_hits.R` | Rhythmic model only: genes significant for h²_rhy per tissue and across tissues; LRT calibration per tissue | `summary/<label>/rhythmic_hits_per_gene.tsv`, `rhythmic_hits_per_fit.tsv`, `rhythmic_calibration.tsv` |
-| `07_plot_components.R` | Rhythmic model only: per tissue, h²_mesor against h²_rhy, one point per gene with SEs on both axes, rhythmic hits in colour (h² by default, σ² with `--scale=var`) | `summary/<label>/components/<tissue>.png`, `components_all_tissues.pdf` |
+| `07_plot_components.R` | Rhythmic model only: per tissue, h²_mesor against h²_rhy, one point per gene with SEs on both axes, rhythmic hits in colour (h² by default, σ² with `--scale=var`) | `summary/<label>/components/<tissue>.png`, `components_all_tissues.pdf`; one plot of tissue means ± SE over genes, one point per tissue: `tissue_means.png`, `.tsv` |
 
 `<label>` is `observed`, or `perm<seed>` for label-shuffled negative controls
 (`--perm-seed=<seed>` on steps 03–05; a random `PERM_GENE_FRACTION` of genes is used).
