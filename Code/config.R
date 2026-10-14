@@ -71,7 +71,7 @@ THREADS       <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
 # unconstrained fits only; results go to a separate <label>/mph folder so they
 # can be compared with GCTA's). MPH estimates traces from random vectors.
 REML_ENGINE        <- "gcta"
-MPH                <- "/home/uqschauq/software/mph"
+MPH                <- "mph"   # on PATH (prebuilt binary), or a full path
 MPH_MAXIT          <- 50
 MPH_RANDOM_VECTORS <- 100   # MPH default; more = less Monte Carlo noise, slower
 FDR_LEVEL     <- 0.1
