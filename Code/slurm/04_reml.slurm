@@ -18,4 +18,7 @@ set -euo pipefail
 source "$SLURM_SUBMIT_DIR/common.sh"   # submit_all.sh submits from slurm/
 load_modules
 export TMPDIR="${TMPDIR:-/tmp}"
+# One thread per CPU requested: MKL/OpenMP (MPH) otherwise start one thread per
+# core of the node and contend for the single allocated core.
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}" MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 Rscript "$CODE_DIR/04_run_reml.R" --chunk="$SLURM_ARRAY_TASK_ID" ${PERM_SEED:+--perm-seed=$PERM_SEED}
