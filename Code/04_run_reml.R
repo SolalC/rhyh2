@@ -182,7 +182,8 @@ fit_gene <- function(g) {
 t0 <- Sys.time()
 res <- map(seq_len(nrow(my_genes)), \(i) fit_gene(my_genes[i, ]), .progress = interactive()) |>
   list_rbind()
-message("Chunk ", chunk, ": ", nrow(res), " fits, ", sum(res$status != "ok"), " failed, ",
+message("Chunk ", chunk, ": ", nrow(res), " fits, ", sum(res$status == "failed"), " failed, ",
+        sum(res$status == "skipped"), " skipped (MPH has no constrained mode), ",
         round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), " min")
 
 write_tsv(res, paste0(out_file, ".partial"))
