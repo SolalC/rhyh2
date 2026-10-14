@@ -30,9 +30,14 @@ CLOCK_GENES <- c("ARNTL", "BMAL1", "ARNTL2", "CLOCK", "NPAS2", "PER1", "PER2", "
                  "NR1D1", "NR1D2", "RORA", "RORB", "RORC", "DBP", "TEF", "HLF", "NFIL3",
                  "BHLHE40", "BHLHE41", "CIART", "CSNK1D", "CSNK1E", "FBXL3", "TIMELESS")
 
-fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(chr = "c", message = "c"),
-                 progress = FALSE) |>
-  filter(mode == "unconstrained", status == "ok", !is.na(h2_rhy), !is.na(lrt)) |>
+all_fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(chr = "c", message = "c"),
+                     progress = FALSE) |>
+  filter(mode == "unconstrained")
+n_failed <- count(filter(all_fits, !usable_fit(all_fits)), tissue, name = "n_failed")
+lrt_all <- if ("lrt_own" %in% names(all_fits)) coalesce(all_fits$lrt_own, all_fits$lrt) else all_fits$lrt
+fits <- all_fits |>
+  mutate(lrt = lrt_all) |>
+  filter(usable_fit(all_fits)) |>                # failed fits are dropped before anything
   mutate(p_rhy = rhythmic_p(h2_rhy, lrt), lrt_failed = is.na(p_rhy)) |>
   group_by(tissue) |>
   mutate(fdr = p.adjust(p_rhy, method = "BH")) |>
@@ -41,10 +46,12 @@ fits <- read_tsv(file.path(p$summary, "per_gene_h2.tsv.gz"), col_types = cols(ch
 
 calibration <- fits |>
   group_by(tissue) |>
-  summarise(n = first(n), n_genes = n(), n_lrt_failed = sum(lrt_failed), n_sig = sum(sig),
+  summarise(n = first(n), n_genes = n(), n_sig = sum(sig),
             frac_p05_gcta = mean(p_lrt < 0.05), frac_p05 = mean(p_rhy < 0.05, na.rm = TRUE),
             frac_p01 = mean(p_rhy < 0.01, na.rm = TRUE),
             frac_h2rhy_le0 = mean(h2_rhy <= 0), .groups = "drop") |>
+  left_join(n_failed, by = "tissue") |>
+  mutate(n_failed = coalesce(n_failed, 0L), .after = n_genes) |>
   arrange(n)
 
 per_gene <- fits |>

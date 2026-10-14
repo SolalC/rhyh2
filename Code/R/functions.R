@@ -176,3 +176,18 @@ rhythmic_p <- function(h2_rhy, lrt, lrt_max = get0("RHY_LRT_MAX", ifnotfound = 1
   p <- pnorm(sign(h2_rhy) * sqrt(pmax(lrt, 0)), lower.tail = FALSE)
   if_else(lrt > lrt_max, NA_real_, p)
 }
+
+# Which fits enter any analysis (means, hits, plots). A fit is kept when it
+# converged (status "ok", h2 estimated, MPH did not hit its iteration limit)
+# and, for unconstrained rhythmic fits, h2_rhy and a usable LRT exist (p_rhy
+# not NA; see rhythmic_p()). Everything else is a failed fit and is dropped.
+usable_fit <- function(fits) {
+  msg <- coalesce(fits$message, "")
+  ok <- fits$status == "ok" & !is.na(fits$h2_local) & !str_detect(msg, "reached --num_iterations")
+  if (get0("MODEL", ifnotfound = "local_only") == "local_rhythmic" && "h2_rhy" %in% names(fits)) {
+    lrt <- if ("lrt_own" %in% names(fits)) coalesce(fits$lrt_own, fits$lrt) else fits$lrt
+    rhy <- fits$mode == "unconstrained"
+    ok <- ok & (!rhy | (!is.na(fits$h2_rhy) & !is.na(rhythmic_p(fits$h2_rhy, lrt))))
+  }
+  ok
+}
