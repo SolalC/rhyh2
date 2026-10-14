@@ -5,8 +5,7 @@
 #     <tissue>.png                 one plot per tissue
 #     components_all_tissues.pdf   the same plots, one page per tissue
 #     tissue_means.png, .tsv       one point per tissue: mean of x and y over its
-#                                  genes, +- SE (sd / sqrt(number of genes)), or
-#                                  +- SD with --bars=sd (tsv has both)
+#                                  genes, +- SE (sd / sqrt(number of genes))
 #   Axes: h2_mesor and h2_rhy (sigma2 / Vp). With --scale=var, the variance
 #   components V(G1) and V(G2) instead, if step 04 stored them (runs after
 #   commit e40a2dd); otherwise it falls back to h2 with a message.
@@ -21,7 +20,7 @@
 #   independent; neighbouring genes share cis windows and all genes share donors,
 #   so it is too small, and the permutation means are the better reference.
 #
-# Usage: Rscript 07_plot_components.R [--perm-seed=<n>] [--scale=h2|var] [--bars=se|sd]
+# Usage: Rscript 07_plot_components.R [--perm-seed=<n>] [--scale=h2|var]
 
 source(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])), "R", "functions.R"))
 suppressPackageStartupMessages(library(ggplot2))
@@ -95,24 +94,18 @@ se <- \(v) sd(v) / sqrt(length(v))
 means <- fits |>
   group_by(tissue) |>
   summarise(n_donors = median(n), n_genes = n(), n_rhythmic = sum(group == levels(group)[2]),
-            x_mean = mean(x), x_sd = sd(x), x_se = se(x), y_mean = mean(y), y_sd = sd(y), y_se = se(y),
-            .groups = "drop")
+            x_mean = mean(x), x_se = se(x), y_mean = mean(y), y_se = se(y), .groups = "drop")
 write_tsv(rename_with(means, \(v) sub("^x", if (use_var) "var_mesor" else "h2_mesor", sub("^y", if (use_var) "var_rhy" else "h2_rhy", v))),
           file.path(out_dir, "tissue_means.tsv"))
-# SE: uncertainty of the tissue mean. SD: spread of the gene estimates, which is
-# between-gene variation plus each gene's sampling error, so it is dominated by
-# the per-gene SEs and does not measure true heterogeneity between genes.
-bars <- if (identical(args$bars, "sd")) "sd" else "se"
-means <- mutate(means, label = gsub("_", " ", tissue),
-                x_bar = if (bars == "sd") x_sd else x_se, y_bar = if (bars == "sd") y_sd else y_se)
+means <- mutate(means, label = gsub("_", " ", tissue))
 g <- ggplot(means, aes(x_mean, y_mean, colour = label)) +
   geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
   geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
-  geom_errorbar(aes(ymin = y_mean - y_bar, ymax = y_mean + y_bar), width = 0, linewidth = 0.4) +
-  geom_errorbar(aes(xmin = x_mean - x_bar, xmax = x_mean + x_bar), orientation = "y", width = 0, linewidth = 0.4) +
+  geom_errorbar(aes(ymin = y_mean - y_se, ymax = y_mean + y_se), width = 0, linewidth = 0.4) +
+  geom_errorbar(aes(xmin = x_mean - x_se, xmax = x_mean + x_se), orientation = "y", width = 0, linewidth = 0.4) +
   geom_point(size = 2) +
   labs(x = x_lab, y = y_lab, colour = NULL,
-       title = sprintf("Tissue means over genes (mean \u00b1 %s)%s", toupper(bars),
+       title = sprintf("Tissue means over genes (mean \u00b1 SE)%s",
                        if (is.na(perm_seed)) "" else sprintf(", permutation %d", perm_seed)),
        subtitle = sprintf("%d tissues, %d-%d genes each", nrow(means), min(means$n_genes), max(means$n_genes))) +
   theme_bw(base_size = 11) +
@@ -127,6 +120,5 @@ if (requireNamespace("ggrepel", quietly = TRUE)) {
   g <- g + theme(legend.position = "right", legend.text = element_text(size = 7)) +
     guides(colour = guide_legend(ncol = 1 + (nrow(means) > 25)))
 }
-png_file <- file.path(out_dir, if (bars == "sd") "tissue_means_sd.png" else "tissue_means.png")
-ggsave(png_file, g, width = 10, height = 8, dpi = 150)
-message("Tissue means written to ", png_file)
+ggsave(file.path(out_dir, "tissue_means.png"), g, width = 10, height = 8, dpi = 150)
+message("Tissue means written to ", file.path(out_dir, "tissue_means.png"))
