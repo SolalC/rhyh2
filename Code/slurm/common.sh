@@ -1,7 +1,9 @@
 # Shared settings for the SLURM scripts. EDIT THESE on Bunya.
 # Account, partition, constraint and resources are in each .slurm header.
 # Job logs go to slurm/logs/ (relative to the submission folder).
-CODE_DIR="/scratch/user/uqschauq/rhyh2/Code"            # this folder, on Bunya
+# Code folder = parent of this slurm/ folder, so a second checkout (git worktree)
+# runs its own code. Override with CODE_DIR=... if needed.
+CODE_DIR="${CODE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 R_MODULE="r/4.4.2-heavy"             # check: module avail r
 # Uncomment if plink2/gcta64 are modules rather than full paths in config.R:
 # PLINK2='/home/uqschauq/software/plink2'
