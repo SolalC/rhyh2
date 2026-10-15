@@ -69,15 +69,19 @@ run_mph <- function(grm_prefixes, inputs, mpheno, out) {
   unlink(paste0(out, ".mq.", c("vc", "iter"), ".csv"))
   list_file <- paste0(out, ".grm_list.txt")
   write_lines(grm_prefixes, list_file)
-  res <- run_cmd(MPH, c("--reml", "--grm_list", list_file,
+  # under coreutils timeout: one hung MPH call otherwise stalls the whole chunk
+  timeout_s <- get0("MPH_TIMEOUT", ifnotfound = 600)
+  if (!nzchar(Sys.which(MPH))) stop("Cannot find MPH executable '", MPH, "'; set MPH in config.R")
+  res <- run_cmd("timeout", c(timeout_s, MPH, "--reml", "--grm_list", list_file,
                         "--phenotype_file", paste0(inputs, ".phen.csv"), "--trait", paste0("g", mpheno),
                         "--covariate_file", paste0(inputs, ".covar.csv"), "--covariate_names", "all",
                         "--num_iterations", MPH_MAXIT, "--num_random_vectors", MPH_RANDOM_VECTORS,
                         "--seed", SEED, "--num_threads", THREADS, "--output_file", out),
                  allow_fail = TRUE)
   ok <- res$status == 0 && file.exists(paste0(out, ".mq.vc.csv"))
-  list(ok = ok, fit = if (ok) read_mph(out),
-       msg = if (!ok) str_trunc(paste(tail(res$output, 2), collapse = " "), 120))
+  msg <- if (res$status == 124) sprintf("timed out after %s s", timeout_s) else
+    str_trunc(paste(tail(res$output, 2), collapse = " "), 120)
+  list(ok = ok, fit = if (ok) read_mph(out), msg = if (!ok) msg)
 }
 
 # Full (K, K o T) and reduced (K) fits for one gene x tissue; same columns as
