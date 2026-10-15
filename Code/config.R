@@ -73,8 +73,6 @@ THREADS       <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
 REML_ENGINE        <- "gcta"
 MPH                <- "mph"   # on PATH (prebuilt binary), or a full path
 MPH_MAXIT          <- 50
-MPH_TIMEOUT        <- 600   # seconds per MPH call (normal: < 1 s); a call that
-                            # hangs is killed and the fit recorded as failed
 MPH_RANDOM_VECTORS <- 100   # MPH default; more = less Monte Carlo noise, slower
 FDR_LEVEL     <- 0.1
 SEED          <- 20261008
