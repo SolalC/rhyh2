@@ -7,6 +7,10 @@
 #     components_all_tissues.pdf   the same plots, one page per tissue
 #     tissue_means.png, .tsv       one point per tissue: mean of x and y over its
 #                                  genes, +- SE (sd / sqrt(number of genes))
+#   and the same files for rhythmic genes only in components/rhythmic_genes/:
+#   genes whose mean expression has a population rhythm in that tissue (fixed
+#   cos/sin F-test, BH FDR < FDR_LEVEL; step 06b, fixed_rhythm.tsv.gz). Skipped
+#   with a message if step 06b has not been run.
 #   Axes: h2_mesor and h2_rhy (sigma2 / Vp). With --scale=var, the variance
 #   components V(G1) and V(G2) instead, if step 04 stored them (runs after
 #   commit e40a2dd); otherwise it falls back to h2 with a message.
@@ -22,6 +26,7 @@
 #   so it is too small, and the permutation means are the better reference.
 #
 # Usage: Rscript 07_plot_components.R [--perm-seed=<n>] [--scale=h2|var]
+# (run 06b_fixed_rhythm.R first for the rhythmic-gene plots)
 
 source(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])), "R", "functions.R"))
 suppressPackageStartupMessages(library(ggplot2))
@@ -54,9 +59,9 @@ fits <- fits |>
   group_by(tissue) |>
   mutate(fdr = p.adjust(p_rhy, method = "BH")) |>
   ungroup() |>
-  mutate(group = if_else(!is.na(fdr) & fdr < FDR_LEVEL, "Rhythmic FDR < 0.05", "Not significant") |>
-           factor(levels = c("Not significant", "Rhythmic FDR < 0.05")))
-if (FDR_LEVEL != 0.05) levels(fits$group)[2] <- paste0("Rhythmic FDR < ", FDR_LEVEL)
+  mutate(group = if_else(!is.na(fdr) & fdr < FDR_LEVEL, "h2_rhy FDR < 0.05", "Not significant") |>
+           factor(levels = c("Not significant", "h2_rhy FDR < 0.05")))
+if (FDR_LEVEL != 0.05) levels(fits$group)[2] <- paste0("h2_rhy FDR < ", FDR_LEVEL)
 x_lab <- if (use_var) quote(sigma^2 ~ mesor) else quote(h^2 ~ mesor ~ (sigma^2 ~ mesor / V[P]))
 y_lab <- if (use_var) quote(sigma^2 ~ rhythmic) else quote(h^2 ~ rhythmic ~ (sigma^2 ~ rhythmic / V[P]))
 if (want_var && !use_var) message("No variance components for some or all fits (step 04 run before they were stored): ",
@@ -64,7 +69,7 @@ if (want_var && !use_var) message("No variance components for some or all fits (
                       "the residual variance after covariates.")
 
 cols <- setNames(c("grey65", "#2a78d6"), levels(fits$group))
-plot_tissue <- function(d) {
+plot_tissue <- function(d, note = "") {
   d <- arrange(d, group)                     # significant genes drawn last, on top
   n_sig <- sum(d$group == levels(d$group)[2])
   fit <- lm(y ~ x, data = d)                 # OLS over all genes, ignoring the SEs
@@ -76,8 +81,8 @@ plot_tissue <- function(d) {
     geom_point(size = 0.8, alpha = 0.6) +
     geom_smooth(aes(group = 1), method = "lm", formula = y ~ x, colour = "black", linewidth = 0.6, se = TRUE) +
     scale_colour_manual(values = cols, drop = FALSE, name = NULL) +
-    labs(x = x_lab, y = y_lab, title = gsub("_", " ", d$tissue[1]),
-         subtitle = sprintf("n = %d donors, %d genes, %d rhythmic at FDR < %g%s\nOLS slope = %.3f (SE %.3f), r = %.2f",
+    labs(x = x_lab, y = y_lab, title = paste0(gsub("_", " ", d$tissue[1]), note),
+         subtitle = sprintf("n = %d donors, %d genes, %d with h2_rhy FDR < %g%s\nOLS slope = %.3f (SE %.3f), r = %.2f",
                             median(d$n), nrow(d), n_sig, FDR_LEVEL,
                             if (is.na(perm_seed)) "" else sprintf(" (permutation %d)", perm_seed),
                             coef(fit)[2], sqrt(vcov(fit)[2, 2]), cor(d$x, d$y))) +
@@ -85,44 +90,66 @@ plot_tissue <- function(d) {
     theme(legend.position = "top", panel.grid.minor = element_blank())
 }
 
-tissues <- sort(unique(fits$tissue))
-plots <- map(set_names(tissues), \(t) plot_tissue(filter(fits, tissue == t)))
-iwalk(plots, \(g, t) ggsave(file.path(out_dir, paste0(t, ".png")), g, width = 6, height = 6, dpi = 150))
-pdf(file.path(out_dir, "components_all_tissues.pdf"), width = 6, height = 6)
-walk(plots, print)
-invisible(dev.off())
-message(length(plots), " tissue plots written to ", out_dir)
+# ---- outputs: all genes, then rhythmic genes only ---------------------------
+write_outputs <- function(fits, out_dir, note = "") {
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  tissues <- sort(unique(fits$tissue))
+  plots <- map(set_names(tissues), \(t) plot_tissue(filter(fits, tissue == t), note))
+  iwalk(plots, \(g, t) ggsave(file.path(out_dir, paste0(t, ".png")), g, width = 6, height = 6, dpi = 150))
+  pdf(file.path(out_dir, "components_all_tissues.pdf"), width = 6, height = 6)
+  walk(plots, print)
+  invisible(dev.off())
+  message(length(plots), " tissue plots written to ", out_dir)
 
-# ---- tissue means -----------------------------------------------------------
-se <- \(v) sd(v) / sqrt(length(v))
-means <- fits |>
-  group_by(tissue) |>
-  summarise(n_donors = median(n), n_genes = n(), n_rhythmic = sum(group == levels(group)[2]),
-            x_mean = mean(x), x_se = se(x), y_mean = mean(y), y_se = se(y), .groups = "drop")
-write_tsv(rename_with(means, \(v) sub("^x", if (use_var) "var_mesor" else "h2_mesor", sub("^y", if (use_var) "var_rhy" else "h2_rhy", v))),
-          file.path(out_dir, "tissue_means.tsv"))
-means <- mutate(means, label = gsub("_", " ", tissue))
-g <- ggplot(means, aes(x_mean, y_mean, colour = label)) +
-  geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
-  geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
-  geom_errorbar(aes(ymin = y_mean - y_se, ymax = y_mean + y_se), width = 0, linewidth = 0.4) +
-  geom_errorbar(aes(xmin = x_mean - x_se, xmax = x_mean + x_se), orientation = "y", width = 0, linewidth = 0.4) +
-  geom_point(size = 2) +
-  labs(x = x_lab, y = y_lab, colour = NULL,
-       title = sprintf("Tissue means over genes (mean \u00b1 SE)%s",
-                       if (is.na(perm_seed)) "" else sprintf(", permutation %d", perm_seed)),
-       subtitle = sprintf("%d tissues, %d-%d genes each", nrow(means), min(means$n_genes), max(means$n_genes))) +
-  theme_bw(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-# 50 hues are not distinguishable, so name each point directly when ggrepel is
-# installed; otherwise rely on the legend
-if (requireNamespace("ggrepel", quietly = TRUE)) {
-  g <- g + ggrepel::geom_text_repel(aes(label = label), size = 2.5, max.overlaps = Inf, show.legend = FALSE,
-                                    min.segment.length = 0, segment.size = 0.2) +
-    theme(legend.position = "none")
-} else {
-  g <- g + theme(legend.position = "right", legend.text = element_text(size = 7)) +
-    guides(colour = guide_legend(ncol = 1 + (nrow(means) > 25)))
+  # ---- tissue means -----------------------------------------------------------
+  se <- \(v) sd(v) / sqrt(length(v))
+  means <- fits |>
+    group_by(tissue) |>
+    summarise(n_donors = median(n), n_genes = n(), n_rhythmic = sum(group == levels(group)[2]),
+              x_mean = mean(x), x_se = se(x), y_mean = mean(y), y_se = se(y), .groups = "drop")
+  write_tsv(rename_with(means, \(v) sub("^x", if (use_var) "var_mesor" else "h2_mesor", sub("^y", if (use_var) "var_rhy" else "h2_rhy", v))),
+            file.path(out_dir, "tissue_means.tsv"))
+  means <- mutate(means, label = gsub("_", " ", tissue))
+  g <- ggplot(means, aes(x_mean, y_mean, colour = label)) +
+    geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
+    geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
+    geom_errorbar(aes(ymin = y_mean - y_se, ymax = y_mean + y_se), width = 0, linewidth = 0.4) +
+    geom_errorbar(aes(xmin = x_mean - x_se, xmax = x_mean + x_se), orientation = "y", width = 0, linewidth = 0.4) +
+    geom_point(size = 2) +
+    labs(x = x_lab, y = y_lab, colour = NULL,
+         title = sprintf("Tissue means over genes (mean \u00b1 SE)%s%s", note,
+                         if (is.na(perm_seed)) "" else sprintf(", permutation %d", perm_seed)),
+         subtitle = sprintf("%d tissues, %d-%d genes each", nrow(means), min(means$n_genes), max(means$n_genes))) +
+    theme_bw(base_size = 11) +
+    theme(panel.grid.minor = element_blank())
+  # 50 hues are not distinguishable, so name each point directly when ggrepel is
+  # installed; otherwise rely on the legend
+  if (requireNamespace("ggrepel", quietly = TRUE)) {
+    g <- g + ggrepel::geom_text_repel(aes(label = label), size = 2.5, max.overlaps = Inf, show.legend = FALSE,
+                                      min.segment.length = 0, segment.size = 0.2) +
+      theme(legend.position = "none")
+  } else {
+    g <- g + theme(legend.position = "right", legend.text = element_text(size = 7)) +
+      guides(colour = guide_legend(ncol = 1 + (nrow(means) > 25)))
+  }
+  ggsave(file.path(out_dir, "tissue_means.png"), g, width = 10, height = 8, dpi = 150)
+  message("Tissue means written to ", file.path(out_dir, "tissue_means.png"))
 }
-ggsave(file.path(out_dir, "tissue_means.png"), g, width = 10, height = 8, dpi = 150)
-message("Tissue means written to ", file.path(out_dir, "tissue_means.png"))
+
+write_outputs(fits, out_dir)
+
+rhythm_file <- file.path(p$summary, "fixed_rhythm.tsv.gz")
+if (file.exists(rhythm_file)) {
+  rhythmic <- read_tsv(rhythm_file, col_types = cols(tissue = "c", gene_id = "c", .default = "d"),
+                       progress = FALSE) |>
+    filter(fdr_rhythm < FDR_LEVEL) |>
+    select(tissue, gene_id)
+  fits_rhy <- semi_join(fits, rhythmic, by = c("tissue", "gene_id"))
+  message(nrow(fits_rhy), " of ", nrow(fits), " fits are rhythmic genes (fixed cos/sin FDR < ", FDR_LEVEL, ")")
+  if (nrow(fits_rhy) > 0) {
+    write_outputs(fits_rhy, file.path(out_dir, "rhythmic_genes"),
+                  note = sprintf(" (rhythmic genes, fixed cos/sin FDR < %g)", FDR_LEVEL))
+  }
+} else {
+  message("No ", rhythm_file, ": run 06b_fixed_rhythm.R for the rhythmic-gene plots")
+}
