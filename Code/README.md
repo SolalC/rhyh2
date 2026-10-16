@@ -182,8 +182,9 @@ PLINK2=/path/to/plink2 GCTA=/path/to/gcta64 bash Code/tests/run_toy_test.sh
 
 ```bash
 cd Code/slurm
-bash submit_all.sh                          # steps 01-05 with dependencies
+bash submit_all.sh                          # steps 01-07 with dependencies
 PERM_SEED=1 bash submit_all.sh --from=03    # permutation negative control
+bash submit_all.sh --from=06                # steps 06-07 only (slurm/06_post.slurm)
 ```
 
 The array size in `slurm/04_reml.slurm` must equal `N_CHUNKS`. Finished chunks are skipped,

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Submit the whole pipeline with dependencies. Run from this folder on Bunya:
-#   bash submit_all.sh            # observed data, steps 01-05
+#   bash submit_all.sh            # observed data, steps 01-07
 #   bash submit_all.sh --from=03  # restart from a later step
 #   PERM_SEED=1 bash submit_all.sh --from=03   # permutation (negative control)
 #   bash submit_all.sh --from=03 --peer          # first re-estimate PEER (step 00);
@@ -31,4 +31,5 @@ if $PEER; then
 fi
 [[ $FROM < 04 ]] && jid=$(submit 03_expression.slurm $jid) && echo "03 expression: $jid"
 [[ $FROM < 05 ]] && jid=$(submit 04_reml.slurm $jid)       && echo "04 REML:       $jid"
-jid=$(submit 05_summarise.slurm $jid) && echo "05 summarise:  $jid"
+[[ $FROM < 06 ]] && jid=$(submit 05_summarise.slurm $jid) && echo "05 summarise:  $jid"
+jid=$(submit 06_post.slurm $jid) && echo "06-07 hits/plots: $jid"
