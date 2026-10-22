@@ -15,6 +15,9 @@
 # (default 2000) chunks, so submit twice:
 #   sbatch 04b_shuffle.slurm
 #   CHUNK_OFFSET=1000 sbatch 04b_shuffle.slurm
+# Walltime: a step 04 rhythmic chunk (1/200 of the genes, 2 MPH calls per fit)
+# takes ~162 min; here 1/2000 of the genes x 101 single-GRM calls is at most
+# ~162 x 101 / 2 / 10 = ~820 min (13.6 h).
 # Finished chunks are skipped, so failed tasks can be resubmitted
 # (sbatch --array=<ids> ..., with the same CHUNK_OFFSET).
 set -euo pipefail

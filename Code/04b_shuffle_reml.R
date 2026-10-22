@@ -88,10 +88,18 @@ fit_shuffles <- function(g, tissue, mpheno, K_all) {
   inputs <- file.path(tmp, "shuffle")
   write_csv(as_tibble(shuffled) |> mutate(id = iid, .before = 1), paste0(inputs, ".phen.csv"))
   write_csv(tibble(id = iid, one = 1), paste0(inputs, ".covar.csv"))
+  # each call runs under MPH_TIMEOUT (run_mph); after one timeout the remaining
+  # shuffles of this gene x tissue are not attempted, so a hanging gene cannot
+  # cost 101 timeouts
+  timed_out <- FALSE
   map(0:N_SHUFFLES, \(k) {
+    if (timed_out) return(tibble(shuffle = k, status = "failed", h2 = NA_real_, se = NA_real_,
+                                 message = "not run: an earlier shuffle timed out"))
     fit <- run_mph(file.path(tmp, "mph_K_loc"), inputs, paste0("s", k), file.path(tmp, "mph"))
-    if (!fit$ok) return(tibble(shuffle = k, status = "failed", h2 = NA_real_, se = NA_real_,
-                               message = paste("mph:", fit$msg)))
+    if (!fit$ok) {
+      if (str_detect(fit$msg, "^timed out")) timed_out <<- TRUE
+      return(tibble(shuffle = k, status = "failed", h2 = NA_real_, se = NA_real_, message = paste("mph:", fit$msg)))
+    }
     f <- fit$fit
     bad <- is.na(f$pve[1]) || is.na(f$se_pve[1]) || f$se_pve[1] <= 0 || abs(f$pve[1]) > 1
     tibble(shuffle = k, status = if (bad || f$n_iter >= MPH_MAXIT) "failed" else "ok",
