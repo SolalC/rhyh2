@@ -22,7 +22,7 @@ should leave it.
 | Estimates | Unconstrained (`--reml-no-constrain`) for means and P-values; constrained for BSLMM comparison | Both (`REML_MODES`) |
 | Covariates | Methods state 15 PEER factors + sex (for the OTD model); not stated for whole-tissue h² | First 15 `InferredCov` (PEER) factors of the GTEx covariate file + sex; optional expression PCs and genotype PCs |
 | Significance | BH FDR < 0.1 from the "two-sided GCTA P-value" | BH FDR < 0.1 within tissue from GCTA's LRT P-value of the unconstrained fit |
-| SE of mean h² | From 100 label shuffles | Naive SE and chromosome jackknife; label-shuffle runs available (`--perm-seed`) |
+| SE of mean h² | From 100 label shuffles | Chromosome jackknife (step 05); SD over 100 expression shuffles of the tissue mean (steps 04b–05b, MPH) |
 
 ### Deviations to keep in mind when comparing with Table 1
 
@@ -119,8 +119,10 @@ K∘T in MPH's binary format, converts each tissue's phenotype and covariate fil
 (intercept, quantitative covariates, 0/1 dummies for sex), and runs the full model and the
 local-only model, so the LRT is 2 × (logL_full − logL_reduced) (also stored as `lrt_own`).
 
-- Rhythmic model only, unconstrained only (MPH has no constrained mode; constrained rows
-  are written with status `skipped`). Estimates may be negative, as with GCTA's `--reml-no-constrain`.
+- Rhythmic and local-only models, unconstrained only (MPH has no constrained mode; constrained rows
+  are written with status `skipped`). Local-only: MPH cannot fit a model without a GRM, so the
+  LRT uses REML log-likelihoods evaluated in R (`reml_loglik()`), the full one at MPH's
+  estimates and the null one at its closed-form optimum; MPH's own value is kept as `logL_mph`. Estimates may be negative, as with GCTA's `--reml-no-constrain`.
 - Results go to `<model>/<cov_source>/mph/<observed|permN>`, next to GCTA's, so both can be
   compared; steps 03–07 must be run with the same `REML_ENGINE`.
 - Same degeneracy rule as for GCTA (`is_degenerate()`); `cov_var_g12` holds the sampling
@@ -161,6 +163,8 @@ g++ -fopenmp build/*.o -o build/mph -L<mkl lib dir> -lmkl_rt -lpthread -lm -ldl
 | `02_genes_and_grms.R` | Gene windows and local SNP counts; LOCO GRMs if `local_distal` | `genes/genes.tsv`, `grm/` |
 | `03_prepare_expression.R` | Per-tissue phenotype, covariate and keep files (GCTA format) | `pheno/<label>/` |
 | `04_run_reml.R` | Per gene: local GRM (once), REML in each tissue × mode | `results/<label>/chunk_*.tsv` |
+| `04b_shuffle_reml.R` | Wheeler Table 1 SE (MPH, local-only): per gene × tissue, expression residualised on the covariates, shuffled across donors `N_SHUFFLES` = 100 times (independently per gene × tissue), each shuffle fitted with the local GRM and an intercept; shuffle 0 = unshuffled. All genes by default (`SHUFFLE_GENE_FRACTION`), `SHUFFLE_N_CHUNKS` = 2000 | `results/<label>/shuffle/chunk_*.tsv` |
+| `05b_shuffle_se.R` | Per tissue: SD over shuffles of the tissue mean h² (`sd_shuffle_mean`, the SE used here), Wheeler's code version (SD over genes of each gene's shuffle mean, `44_calc_SE_from_perms.R` in github.com/hwheeler01/GenArch; it scales as 1/√100, not with the number of genes), null mean; joined with Table 1 and step 05 | `summary/<label>/shuffle_se.tsv` |
 | `05_summarise.R` | Combine, per-tissue means/SE/FDR, convergence, comparison with Table 1 and GenArchDB | `summary/<label>/` |
 | `06_rhythmic_hits.R` | Rhythmic model only: genes significant for h²_rhy per tissue and across tissues; LRT calibration per tissue | `summary/<label>/rhythmic_hits_per_gene.tsv`, `rhythmic_hits_per_fit.tsv`, `rhythmic_calibration.tsv` |
 | `06b_fixed_rhythm.R` | Rhythmic model only: per gene and tissue, F-test (exact LRT) of covariates vs covariates + cos/sin, ordinary linear model on the step 03 files; amplitude, acrophase, partial R² | `summary/<label>/fixed_rhythm.tsv.gz` |
@@ -185,6 +189,9 @@ cd Code/slurm
 bash submit_all.sh                          # steps 01-07 with dependencies
 PERM_SEED=1 bash submit_all.sh --from=03    # permutation negative control
 bash submit_all.sh --from=06                # steps 06-07 only (slurm/06_post.slurm)
+# Table 1 SE (MODEL "local_only", REML_ENGINE "mph", step 03 done for that label):
+sbatch 04b_shuffle.slurm && CHUNK_OFFSET=1000 sbatch 04b_shuffle.slurm   # 2000 chunks
+sbatch 05b_shuffle_se.slurm                 # after all 04b chunks
 ```
 
 The array size in `slurm/04_reml.slurm` must equal `N_CHUNKS`. Finished chunks are skipped,

@@ -54,6 +54,8 @@ if (!is.na(perm_seed)) {
 chunk_id <- cut(seq_len(nrow(genes)), breaks = min(N_CHUNKS, nrow(genes)), labels = FALSE)
 my_genes <- genes[chunk_id == chunk, ]
 message("Chunk ", chunk, "/", N_CHUNKS, " (", label, "): ", nrow(my_genes), " genes")
+# expression columns of this chunk's genes, per tissue (local-only MPH reads them into R)
+chunk_mpheno <- tissue_genes |> filter(gene_id %in% my_genes$gene_id) |> with(split(mpheno, tissue))
 
 tmp <- file.path(TMP_ROOT, paste0("rhyh2_", label, "_chunk", chunk, "_", Sys.getpid()))
 dir.create(tmp, recursive = TRUE, showWarnings = FALSE)
@@ -70,11 +72,13 @@ walk(unique(my_genes$chr), \(chr) {
 region_bim <- map(set_names(unique(my_genes$chr)), \(chr) read_bim(region_prefix(chr)))
 
 if (REML_ENGINE == "mph") {
-  if (MODEL != "local_rhythmic") stop("REML_ENGINE = \"mph\" is implemented for MODEL = \"local_rhythmic\" only")
+  if (!MODEL %in% c("local_rhythmic", "local_only")) {
+    stop("REML_ENGINE = \"mph\" is implemented for MODEL \"local_rhythmic\" and \"local_only\" only")
+  }
   source(file.path(code_dir(), "R", "mph.R"))
 }
+if (MODEL == "local_rhythmic" || REML_ENGINE == "mph") source(file.path(code_dir(), "R", "grm_io.R"))
 if (MODEL == "local_rhythmic") {
-  source(file.path(code_dir(), "R", "grm_io.R"))
   tissue_phase <- map(set_names(tissues$tissue), \(t)
     read_tsv(file.path(p$pheno, paste0(t, ".phase")), col_names = c("fid", "iid", "phase"),
              col_types = "ccd", progress = FALSE))
@@ -151,10 +155,19 @@ fit_gene <- function(g) {
     local_rhythmic = NULL,                       # tissue-specific, built below
     stop("Unknown MODEL: ", MODEL)
   )
-  if (MODEL == "local_rhythmic") K_all <- read_grm_bin(local_grm)
+  if (MODEL == "local_rhythmic" || REML_ENGINE == "mph") K_all <- read_grm_bin(local_grm)
   # Rhythmic model: K and K o T restricted to the tissue's donors (T depends on
   # their phases), written as GCTA binary GRMs.
   tissue_grm_args <- function(t) {
+    if (MODEL == "local_only" && REML_ENGINE == "mph") {
+      # MPH has no --keep: the local GRM restricted to the tissue's donors, in .phen order
+      iid <- tissue_design(file.path(p$pheno, t), keep = chunk_mpheno[[t]])$iid
+      idx <- match(iid, K_all$ids$iid)
+      if (anyNA(idx)) stop(t, ": donors missing from the local GRM")
+      mph_K_current <<- K_all$K[idx, idx]
+      write_grm_mph(file.path(tmp, "mph_K_loc"), mph_K_current, iid)
+      return(grm_args)
+    }
     if (MODEL != "local_rhythmic") return(grm_args)
     ph <- tissue_phase[[t]]
     idx <- match(ph$iid, K_all$ids$iid)
