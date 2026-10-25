@@ -126,10 +126,21 @@ fit_gene <- function(g) {
            .after = tissue)
 }
 
+# One file per finished gene, so a chunk killed at the walltime resumes where it
+# stopped when resubmitted; combined into chunk_<i>.tsv at the end.
+gene_dir <- file.path(out_dir, sprintf("chunk_%04d_genes", chunk))
+dir.create(gene_dir, showWarnings = FALSE)
 t0 <- Sys.time()
 res <- map(seq_len(nrow(my_genes)), \(i) {
+  gene_file <- file.path(gene_dir, paste0(my_genes$gene_id[i], ".tsv"))
+  if (file.exists(gene_file)) {
+    message("gene ", i, "/", nrow(my_genes), " ", my_genes$gene_id[i], ": done in an earlier run")
+    return(read_tsv(gene_file, col_types = cols(chr = "c", message = "c"), progress = FALSE))
+  }
   t_g <- Sys.time()
   out <- fit_gene(my_genes[i, ])
+  write_tsv(out, paste0(gene_file, ".partial"))
+  file.rename(paste0(gene_file, ".partial"), gene_file)
   message(format(Sys.time(), "%H:%M:%S"), " gene ", i, "/", nrow(my_genes), " ", my_genes$gene_id[i], ": ",
           n_distinct(out$tissue), " tissues, ", sum(out$status == "failed"), " of ", nrow(out), " fits failed, ",
           round(as.numeric(difftime(Sys.time(), t_g, units = "secs"))), " s")
@@ -140,3 +151,4 @@ message("Chunk ", chunk, ": ", nrow(res), " fits, ", sum(res$status == "failed")
         round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), " min")
 write_tsv(res, paste0(out_file, ".partial"))
 file.rename(paste0(out_file, ".partial"), out_file)
+unlink(gene_dir, recursive = TRUE)
