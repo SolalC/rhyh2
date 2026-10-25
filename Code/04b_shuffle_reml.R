@@ -120,14 +120,28 @@ fit_gene <- function(g) {
                   "--thread-num", THREADS, "--out", local_grm))
   K_all <- read_grm_bin(local_grm)
   todo <- filter(tissue_genes, gene_id == g$gene_id)
-  map2(todo$tissue, todo$mpheno, \(t, k) fit_shuffles(g, t, k, K_all)) |>
+  # one file per finished gene x tissue: a gene that needs more than one
+  # walltime still progresses across resubmissions
+  map2(todo$tissue, todo$mpheno, \(t, k) {
+    f <- file.path(gene_dir, paste0(g$gene_id, "__", t, ".tsv"))
+    if (file.exists(f)) return(read_tsv(f, col_types = cols(message = "c"), progress = FALSE))
+    t_t <- Sys.time()
+    out <- fit_shuffles(g, t, k, K_all)
+    write_tsv(out, paste0(f, ".partial"))
+    file.rename(paste0(f, ".partial"), f)
+    message(format(Sys.time(), "%H:%M:%S"), "   ", g$gene_id, " ", t, ": n = ", out$n[1], ", ",
+            sum(out$status == "failed"), " of ", nrow(out), " failed, ",
+            round(as.numeric(difftime(Sys.time(), t_t, units = "secs"))), " s")
+    out
+  }) |>
     list_rbind() |>
     mutate(gene_id = g$gene_id, gene_name = g$gene_name, chr = g$chr, n_snps_local = length(snps),
            .after = tissue)
 }
 
-# One file per finished gene, so a chunk killed at the walltime resumes where it
-# stopped when resubmitted; combined into chunk_<i>.tsv at the end.
+# One file per finished gene (and per gene x tissue, in fit_gene), so a chunk
+# killed at the walltime resumes where it stopped when resubmitted; combined
+# into chunk_<i>.tsv at the end.
 gene_dir <- file.path(out_dir, sprintf("chunk_%04d_genes", chunk))
 dir.create(gene_dir, showWarnings = FALSE)
 t0 <- Sys.time()
