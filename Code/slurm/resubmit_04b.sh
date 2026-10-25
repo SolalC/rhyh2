@@ -22,10 +22,7 @@ if (( queued > 0 )); then
 fi
 
 # results folder and chunk count from the config
-read -r shuffle_dir n_chunks < <(cd "$CODE_DIR" && Rscript -e '
-  suppressMessages({source("R/functions.R"); load_config()})
-  cat(file.path(out_paths(OUT_DIR, run_label(NA))$results, "shuffle"),
-      get0("SHUFFLE_N_CHUNKS", ifnotfound = 2000), "\n")') || true
+read -r shuffle_dir n_chunks < <(Rscript "$CODE_DIR/04b_info.R" 2>/dev/null | tail -1) || true
 [[ -n "${n_chunks:-}" ]] || { echo "Could not read OUT_DIR / SHUFFLE_N_CHUNKS from $RHYH2_CONFIG"; exit 1; }
 echo "Config: $RHYH2_CONFIG"
 echo "Output: $shuffle_dir ($n_chunks chunks)"
@@ -36,10 +33,15 @@ for ((c = 1; c <= n_chunks; c++)); do
 done
 echo "Done: $(( n_chunks - ${#missing[@]} )) of $n_chunks; missing: ${#missing[@]}"
 (( ${#missing[@]} == 0 )) && { echo "Nothing to resubmit; run: sbatch --export=ALL 05b_shuffle_se.slurm"; exit 0; }
-echo "Missing chunks: ${missing[*]}"
-echo "SLURM state of their last tasks (from the logs):"
-for c in "${missing[@]}"; do
-  log=$(grep -l "^Chunk $c/" logs/rhyh2_04b_shuffle_*.err 2>/dev/null | tail -1 || true)
+echo "Missing chunks: ${missing[*]:0:30}$( (( ${#missing[@]} > 30 )) && echo " ...")"
+# chunk -> latest log of this run (one pass over the logs); SLURM state shown for the first 20
+declare -A chunk_log
+while IFS=: read -r log line; do
+  c=${line#Chunk }; c=${c%%/*}; chunk_log[$c]=$log
+done < <(grep -H -m1 "^Chunk [0-9]*/[0-9]* (mph/observed" logs/rhyh2_04b_shuffle_*.err 2>/dev/null | sort)
+echo "SLURM state of the last task of the first missing chunks (from the logs):"
+for c in "${missing[@]:0:20}"; do
+  log=${chunk_log[$c]:-}
   [[ -z $log ]] && { echo "  chunk $c: no log"; continue; }
   id=$(basename "$log" .err | sed 's/^rhyh2_04b_shuffle_//')
   echo "  chunk $c: $(sacct -j "$id" -X -n -o State,Elapsed,MaxRSS 2>/dev/null | head -1 | xargs) ($log)"
@@ -49,7 +51,16 @@ done
 # array index = chunk - CHUNK_OFFSET, with array indices 1-1000
 low=(); high=()
 for c in "${missing[@]}"; do if (( c <= 1000 )); then low+=("$c"); else high+=("$((c - 1000))"); fi; done
-join() { local IFS=,; echo "$*"; }
+# sorted indices -> SLURM range list, e.g. 1 2 3 7 -> 1-3,7
+join() {
+  local out="" start=$1 prev=$1 x
+  for x in "${@:2}" ""; do
+    if [[ -n $x && $x -eq $((prev + 1)) ]]; then prev=$x; continue; fi
+    out+="${out:+,}$start$( ((prev > start)) && echo "-$prev")"
+    start=$x; prev=$x
+  done
+  echo "$out"
+}
 time_arg=(); [[ -n "${TIME:-}" ]] && time_arg=(--time="$TIME")
 jobs=()
 if (( ${#low[@]} )); then
