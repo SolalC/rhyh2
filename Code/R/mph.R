@@ -128,8 +128,11 @@ tissue_design <- local({
   cache <- list()
   function(stem, keep = NULL) {
     if (!is.null(cache[[stem]])) return(cache[[stem]])
-    rd <- \(ext, types) read_tsv(paste0(stem, ext), col_names = FALSE, col_types = types, progress = FALSE)
-    phen <- rd(".phen", cols(X1 = "c", X2 = "c", .default = "d"))
+    rd <- \(ext, types, ...) read_tsv(paste0(stem, ext), col_names = FALSE, col_types = types, progress = FALSE, ...)
+    # only the kept expression columns are parsed: a whole .phen (~18,000 genes)
+    # costs GBs of memory per tissue
+    phen <- if (is.null(keep)) rd(".phen", cols(X1 = "c", X2 = "c", .default = "d")) else
+      rd(".phen", cols(X1 = "c", X2 = "c", .default = "d"), col_select = all_of(c(1, 2, sort(keep) + 2)))
     qcov <- rd(".qcovar", cols(X1 = "c", X2 = "c", .default = "d"))
     stopifnot(identical(phen$X2, qcov$X2))
     X <- cbind(one = 1, as.matrix(qcov[, -(1:2)]))
@@ -142,8 +145,7 @@ tissue_design <- local({
       }
     }
     Y <- as.matrix(phen[, -(1:2)])
-    colnames(Y) <- paste0("g", seq_len(ncol(Y)))
-    if (!is.null(keep)) Y <- Y[, paste0("g", keep), drop = FALSE]
+    colnames(Y) <- paste0("g", if (is.null(keep)) seq_len(ncol(Y)) else sort(keep))
     cache[[stem]] <<- list(iid = phen$X2, Y = Y, X = X)
     cache[[stem]]
   }

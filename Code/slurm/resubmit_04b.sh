@@ -4,6 +4,7 @@
 #   bash resubmit_04b.sh             # list the chunks and resubmit them
 #   DRY_RUN=1 bash resubmit_04b.sh   # list only
 #   TIME=48:00:00 bash resubmit_04b.sh   # longer walltime for the resubmitted tasks
+#   MEM=16G bash resubmit_04b.sh         # more memory (default: the .slurm header, 8G)
 # Uses RHYH2_CONFIG if exported, else config_table1.R (the Table 1 run). Chunks resume
 # from their last finished gene, so a chunk that times out again can simply be
 # resubmitted again.
@@ -62,6 +63,7 @@ join() {
   echo "$out"
 }
 time_arg=(); [[ -n "${TIME:-}" ]] && time_arg=(--time="$TIME")
+[[ -n "${MEM:-}" ]] && time_arg+=(--mem="$MEM")
 jobs=()
 if (( ${#low[@]} )); then
   jobs+=("$(CHUNK_OFFSET=0 sbatch --parsable --export=ALL "${time_arg[@]}" --array="$(join "${low[@]}")" 04b_shuffle.slurm)")
