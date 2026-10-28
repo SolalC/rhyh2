@@ -1,7 +1,9 @@
 #!/bin/bash
-# Read-only status of the Table 1 shuffle run (step 04b) and an estimate of the
-# CPU time still needed. Changes nothing.
-SHUF=${SHUF:-/scratch/user/uqschauq/rhyh2/wheeler2016/results/mph/observed/shuffle}
+# Read-only status of a shuffle run (step 04b) and an estimate of the CPU time
+# still needed. Changes nothing. Default: the rhythmic run; for the Table 1 run
+#   LABEL=mph/observed bash check_04b.sh
+LABEL=${LABEL:-local_rhythmic/peer_rhythm/mph/observed}
+SHUF=${SHUF:-/scratch/user/uqschauq/rhyh2/wheeler2016/results/$LABEL/shuffle}
 LOGS=${LOGS:-/scratch/user/uqschauq/rhyh2-mph/Code/slurm/logs}
 N=${N:-2000}; WALL_H=${WALL_H:-24}
 done_list=$(ls "$SHUF" 2>/dev/null | sed -n 's/^chunk_0*\([0-9]*\)\.tsv$/\1/p')
@@ -12,11 +14,11 @@ n_gt=$(find "$SHUF" -path "*/chunk_*_genes/*__*.tsv" 2>/dev/null | wc -l)
 n_gpart=$(find "$SHUF" -path "*/chunk_*_genes/*.tsv" ! -name "*__*" 2>/dev/null | wc -l)
 echo "Saved in unfinished chunks: $n_gpart whole genes, $n_gt gene x tissue fits of 101 shuffles"
 echo "Queued or running 04b tasks: $(squeue -u "$USER" -h -r -n rhyh2_04b_shuffle 2>/dev/null | wc -l)"
-# logs of this run only (label mph/observed): genes per chunk, seconds per gene
-grep -l "(mph/observed)" "$LOGS"/rhyh2_04b_shuffle_*.err 2>/dev/null | xargs -r cat |
-awk -v N="$N" -v wall="$WALL_H" -v done_list="$done_list" -v gpart="$n_gpart" '
+# logs of this run only (its label): genes per chunk, seconds per gene
+grep -l -F "/$N ($LABEL)" "$LOGS"/rhyh2_04b_shuffle_*.err 2>/dev/null | xargs -r cat |
+awk -v N="$N" -v wall="$WALL_H" -v done_list="$done_list" -v gpart="$n_gpart" -v lab="/$N ($LABEL)" '
   BEGIN { split(done_list, d, "\n"); for (i in d) if (d[i] != "") fin[d[i]] = 1 }
-  /^Chunk [0-9]+\/[0-9]+ \(mph\/observed\)/ { split($2, a, "/"); c = a[1]; ngen[c] = $4 }
+  /^Chunk [0-9]+\/[0-9]+ / && index($0, lab) { split($2, a, "/"); c = a[1]; ngen[c] = $4 }
   / gene [0-9]+\/[0-9]+ .* s$/ { s = $(NF - 1); if (s ~ /^[0-9]+$/) { n++; tot += s; if (s > mx) mx = s; if (s > 3600 * wall / 2) big++ } }
   END {
     if (n == 0) { print "No finished genes in the logs yet; no estimate."; exit }

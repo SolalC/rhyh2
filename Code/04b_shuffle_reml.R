@@ -1,13 +1,16 @@
-# Step 04b — null distribution of the tissue mean local h2 from expression
-# shuffles, as in Wheeler et al. 2016 Table 1 (one SLURM array task per chunk).
-#   For each gene (or a random subset, SHUFFLE_GENE_FRACTION < 1) and each tissue
-#   expressing it: expression is residualised on the step 03 covariates (OLS),
-#   the residuals are shuffled across donors N_SHUFFLES times, and each shuffle
-#   is fitted with MPH, local GRM only, intercept as the only fixed effect
+# Step 04b — null distribution of the tissue mean h2 from N_SHUFFLES shuffles per
+# gene x tissue (one SLURM array task per chunk). REML_ENGINE must be "mph".
+#   MODEL "local_only" (Wheeler et al. 2016 Table 1): expression is residualised
+#   on the step 03 covariates (OLS), the residuals are shuffled across donors,
+#   and each shuffle is fitted with the local GRM and an intercept only
 #   (Wheeler et al. shuffled covariate-adjusted expression and fitted GCTA with
-#   the local GRM and no covariates). Each gene x tissue gets its own shuffles,
-#   so null estimates are independent across genes. Shuffle 0 is the unshuffled
-#   residual (observed h2 of the same model, for reference).
+#   the local GRM and no covariates).
+#   MODEL "local_rhythmic": the genotype labels are shuffled (rows and columns of
+#   the local GRM), expression, covariates and phase stay together, and each
+#   shuffle is fitted with K and K o T and the step 03 covariates, as in step 04.
+#   Each gene x tissue gets its own shuffles, so null estimates are independent
+#   across genes. Shuffle 0 is the unshuffled fit, for reference. Genes: all, or
+#   a random subset with SHUFFLE_GENE_FRACTION < 1.
 #   Writes results/<label>/shuffle/chunk_<i>.tsv: one row per gene x tissue x
 #   shuffle. Step 05b summarises them.
 #
@@ -24,6 +27,7 @@ args <- parse_args()
 chunk <- as.integer(args$chunk %||%
   (as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID", NA)) + as.integer(Sys.getenv("CHUNK_OFFSET", "0"))))
 if (is.na(chunk) || chunk < 1 || chunk > SHUFFLE_N_CHUNKS) stop("Give --chunk=<1..", SHUFFLE_N_CHUNKS, ">")
+if (REML_ENGINE != "mph") stop("04b_shuffle_reml.R needs REML_ENGINE = \"mph\"")
 label <- run_label(NA)
 p <- out_paths(OUT_DIR, label)
 source(file.path(code_dir(), "R", "grm_io.R"))
@@ -71,8 +75,29 @@ walk(unique(my_genes$chr), \(chr) {
 })
 region_bim <- map(set_names(unique(my_genes$chr)), \(chr) read_bim(region_prefix(chr)))
 
-# ---- one gene x tissue: residualise, shuffle, fit -----------------------------
-fit_shuffles <- function(g, tissue, mpheno, K_all) {
+# ---- one gene x tissue: shuffle, fit ------------------------------------------
+# Runs MPH on shuffles 0..N_SHUFFLES; fit_k(k) fits shuffle k and returns MPH's
+# result. After one timeout the remaining shuffles of this gene x tissue are not
+# attempted, so a hanging gene cannot cost 101 timeouts. Failed rows get NA in
+# every estimate column (cols).
+run_shuffles <- function(fit_k, row_k, cols) {
+  timed_out <- FALSE
+  map(0:N_SHUFFLES, \(k) {
+    if (timed_out) return(tibble(shuffle = k, status = "failed", message = "not run: an earlier shuffle timed out"))
+    fit <- fit_k(k)
+    if (!fit$ok) {
+      if (str_detect(fit$msg, "^timed out")) timed_out <<- TRUE
+      return(tibble(shuffle = k, status = "failed", message = paste("mph:", fit$msg)))
+    }
+    row_k(fit$fit) |> mutate(shuffle = k, .before = 1)
+  }) |>
+    list_rbind() |>
+    bind_rows(tibble(!!!set_names(rep(list(double()), length(cols)), cols)))
+}
+
+# Local-only model (Wheeler Table 1): expression residualised on the step 03
+# covariates (OLS), residuals shuffled across donors, intercept-only MPH fits.
+fit_shuffles_local <- function(g, tissue, mpheno, K_all) {
   d <- tissue_design(file.path(p$pheno, tissue), keep = chunk_mpheno[[tissue]])
   y <- d$Y[, paste0("g", mpheno)]
   keep <- !is.na(y)
@@ -88,27 +113,66 @@ fit_shuffles <- function(g, tissue, mpheno, K_all) {
   inputs <- file.path(tmp, "shuffle")
   write_csv(as_tibble(shuffled) |> mutate(id = iid, .before = 1), paste0(inputs, ".phen.csv"))
   write_csv(tibble(id = iid, one = 1), paste0(inputs, ".covar.csv"))
-  # each call runs under MPH_TIMEOUT (run_mph); after one timeout the remaining
-  # shuffles of this gene x tissue are not attempted, so a hanging gene cannot
-  # cost 101 timeouts
-  timed_out <- FALSE
-  map(0:N_SHUFFLES, \(k) {
-    if (timed_out) return(tibble(shuffle = k, status = "failed", h2 = NA_real_, se = NA_real_,
-                                 message = "not run: an earlier shuffle timed out"))
-    fit <- run_mph(file.path(tmp, "mph_K_loc"), inputs, paste0("s", k), file.path(tmp, "mph"))
-    if (!fit$ok) {
-      if (str_detect(fit$msg, "^timed out")) timed_out <<- TRUE
-      return(tibble(shuffle = k, status = "failed", h2 = NA_real_, se = NA_real_, message = paste("mph:", fit$msg)))
-    }
-    f <- fit$fit
-    bad <- is.na(f$pve[1]) || is.na(f$se_pve[1]) || f$se_pve[1] <= 0 || abs(f$pve[1]) > 1
-    tibble(shuffle = k, status = if (bad || f$n_iter >= MPH_MAXIT) "failed" else "ok",
-           h2 = f$pve[1], se = f$se_pve[1],
-           message = if (bad) "mph: degenerate" else if (f$n_iter >= MPH_MAXIT) "mph: reached --num_iterations"
-                     else NA_character_)
-  }) |>
-    list_rbind() |>
+  run_shuffles(
+    \(k) run_mph(file.path(tmp, "mph_K_loc"), inputs, paste0("s", k), file.path(tmp, "mph")),
+    \(f) {
+      bad <- is.na(f$pve[1]) || is.na(f$se_pve[1]) || f$se_pve[1] <= 0 || abs(f$pve[1]) > 1
+      tibble(status = if (bad || f$n_iter >= MPH_MAXIT) "failed" else "ok", h2 = f$pve[1], se = f$se_pve[1],
+             message = if (bad) "mph: degenerate" else if (f$n_iter >= MPH_MAXIT) "mph: reached --num_iterations"
+                       else NA_character_)
+    }, c("h2", "se")) |>
     mutate(tissue = tissue, n = length(r), .before = 1)
+}
+
+# Rhythmic model (K and K o T, step 03 covariates including the fixed cos/sin
+# of phase, as in step 04): the genotype labels are shuffled. Shuffle k
+# permutes the donors of the local GRM (K_k = K[pi, pi]) while expression,
+# covariates and phase stay together, so T keeps the true phases and
+# K o T becomes K_k o T. This is the null of perm1 (step 03 --perm-seed):
+# no genetic mesor and no genetic rhythm, population rhythm kept. Shuffle 0 is
+# the unshuffled fit (same model as step 04). h2 = h2_mesor, h2_rhy = rhythmic.
+fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all) {
+  d <- tissue_design(file.path(p$pheno, tissue), keep = chunk_mpheno[[tissue]])
+  y <- d$Y[, paste0("g", mpheno)]
+  keep <- !is.na(y)
+  iid <- d$iid[keep]
+  ph <- tissue_phase[[tissue]]
+  phase <- ph$phase[match(iid, ph$iid)]
+  if (anyNA(phase)) stop(tissue, ": donors missing from the .phase file")
+  idx <- match(iid, K_all$ids$iid)
+  if (anyNA(idx)) stop(tissue, ": donors missing from the local GRM")
+  K <- K_all$K[idx, idx]
+  X <- d$X[keep, , drop = FALSE]
+  colnames(X) <- c("one", paste0("c", seq_len(ncol(X) - 1)))
+  inputs <- file.path(tmp, "shuffle")
+  write_csv(tibble(id = iid, y = y[keep]), paste0(inputs, ".phen.csv"))
+  write_csv(as_tibble(X) |> mutate(id = iid, .before = 1), paste0(inputs, ".covar.csv"))
+  set.seed(SEED + 1000L * g$gene_index + match(tissue, tissues$tissue))
+  perms <- cbind(seq_along(iid), replicate(N_SHUFFLES, sample(length(iid))))
+  run_shuffles(
+    \(k) {
+      K_k <- K[perms[, k + 1], perms[, k + 1]]
+      write_grm_mph(file.path(tmp, "mph_K_loc"), K_k, iid)
+      write_grm_mph(file.path(tmp, "mph_K_rhy"), rhythmic_kernel(K_k, phase, PHASE_PERIOD), iid)
+      run_mph(file.path(tmp, c("mph_K_loc", "mph_K_rhy")), inputs, "y", file.path(tmp, "mph"))
+    },
+    \(f) {
+      bad <- anyNA(f$pve[1:2]) || anyNA(f$se_pve[1:2]) || any(f$se_pve[1:2] <= 0) || any(abs(f$pve[1:2]) > 1)
+      tibble(status = if (bad || f$n_iter >= MPH_MAXIT) "failed" else "ok",
+             h2 = f$pve[1], se = f$se_pve[1], h2_rhy = f$pve[2], se_rhy = f$se_pve[2],
+             var_g1 = f$var[1], var_g2 = f$var[2], var_e = f$var[3],
+             message = if (bad) "mph: degenerate" else if (f$n_iter >= MPH_MAXIT) "mph: reached --num_iterations"
+                       else NA_character_)
+    }, c("h2", "se", "h2_rhy", "se_rhy", "var_g1", "var_g2", "var_e")) |>
+    mutate(tissue = tissue, n = length(iid), .before = 1)
+}
+
+fit_shuffles <- switch(MODEL, local_only = fit_shuffles_local, local_rhythmic = fit_shuffles_rhythmic,
+                       stop("04b_shuffle_reml.R supports MODEL \"local_only\" and \"local_rhythmic\""))
+if (MODEL == "local_rhythmic") {
+  tissue_phase <- map(set_names(tissues$tissue), \(t)
+    read_tsv(file.path(p$pheno, paste0(t, ".phase")), col_names = c("fid", "iid", "phase"),
+             col_types = "ccd", progress = FALSE))
 }
 
 fit_gene <- function(g) {

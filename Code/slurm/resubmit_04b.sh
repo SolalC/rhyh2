@@ -5,12 +5,13 @@
 #   DRY_RUN=1 bash resubmit_04b.sh   # list only
 #   TIME=48:00:00 bash resubmit_04b.sh   # longer walltime for the resubmitted tasks
 #   MEM=16G bash resubmit_04b.sh         # more memory (default: the .slurm header, 8G)
-# Uses RHYH2_CONFIG if exported, else config_table1.R (the Table 1 run). Chunks resume
-# from their last finished gene, so a chunk that times out again can simply be
-# resubmitted again.
+# Uses RHYH2_CONFIG if exported, else config.R (the rhythmic run); for the
+# Table 1 run, export RHYH2_CONFIG=<Code folder>/config_table1.R first. Chunks
+# resume from their last finished gene x tissue, so a chunk that times out again
+# can simply be resubmitted again.
 set -euo pipefail
 cd "$(dirname "$0")"
-export RHYH2_CONFIG="${RHYH2_CONFIG:-$(cd .. && pwd)/config_table1.R}"
+export RHYH2_CONFIG="${RHYH2_CONFIG:-$(cd .. && pwd)/config.R}"
 source common.sh
 mkdir -p logs
 type module >/dev/null 2>&1 || source /etc/profile   # module command outside a login shell
@@ -23,7 +24,7 @@ if (( queued > 0 )); then
 fi
 
 # results folder and chunk count from the config
-read -r shuffle_dir n_chunks < <(Rscript "$CODE_DIR/04b_info.R" 2>/dev/null | tail -1) || true
+read -r shuffle_dir n_chunks label < <(Rscript "$CODE_DIR/04b_info.R" 2>/dev/null | tail -1) || true
 [[ -n "${n_chunks:-}" ]] || { echo "Could not read OUT_DIR / SHUFFLE_N_CHUNKS from $RHYH2_CONFIG"; exit 1; }
 echo "Config: $RHYH2_CONFIG"
 echo "Output: $shuffle_dir ($n_chunks chunks)"
@@ -39,7 +40,7 @@ echo "Missing chunks: ${missing[*]:0:30}$( (( ${#missing[@]} > 30 )) && echo " .
 declare -A chunk_log
 while IFS=: read -r log line; do
   c=${line#Chunk }; c=${c%%/*}; chunk_log[$c]=$log
-done < <(grep -H -m1 "^Chunk [0-9]*/[0-9]* (mph/observed" logs/rhyh2_04b_shuffle_*.err 2>/dev/null | sort)
+done < <(grep -H -m1 -F "/$n_chunks ($label)" logs/rhyh2_04b_shuffle_*.err 2>/dev/null | sort)
 echo "SLURM state of the last task of the first missing chunks (from the logs):"
 for c in "${missing[@]:0:20}"; do
   log=${chunk_log[$c]:-}
