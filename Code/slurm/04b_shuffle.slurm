@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=16G
+#SBATCH --mem=8G
 #SBATCH --job-name=rhyh2_04b_shuffle
 #SBATCH --time=48:00:00
 #SBATCH --partition=general
