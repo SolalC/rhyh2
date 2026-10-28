@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --job-name=rhyh2_04b_shuffle
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=general
 #SBATCH --array 1-1000
 #SBATCH --account=a_imb_cpdg
@@ -18,7 +18,7 @@
 #   CHUNK_OFFSET=1000 sbatch 04b_shuffle.slurm
 # Walltime: the Table 1 run averaged ~64 min per gene (~9 genes per chunk);
 # rhythmic fits have two GRMs and are slower. Tasks that hit the walltime keep
-# every finished gene x tissue and resume from there: resubmit with
+# every finished shuffle and resume at the next one: resubmit with
 # resubmit_04b.sh.
 set -euo pipefail
 source "$SLURM_SUBMIT_DIR/common.sh"

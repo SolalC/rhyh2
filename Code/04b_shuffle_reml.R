@@ -80,24 +80,45 @@ region_bim <- map(set_names(unique(my_genes$chr)), \(chr) read_bim(region_prefix
 # result. After one timeout the remaining shuffles of this gene x tissue are not
 # attempted, so a hanging gene cannot cost 101 timeouts. Failed rows get NA in
 # every estimate column (cols).
-run_shuffles <- function(fit_k, row_k, cols) {
-  timed_out <- FALSE
+# Each finished shuffle is appended to ckpt, and shuffles already in ckpt are
+# not refitted: a task killed at the walltime resumes at the next shuffle (the
+# shuffles are seeded per gene x tissue, so they are the same on every run).
+# The last column (end = 1) marks a complete line: a line cut by the kill is
+# dropped, and the file is rewritten with the complete lines only.
+run_shuffles <- function(fit_k, row_k, cols, ckpt) {
+  template <- tibble(shuffle = integer(), status = character(),
+                     !!!set_names(rep(list(double()), length(cols)), cols), message = character(), end = integer())
+  done <- template
+  if (file.exists(ckpt)) {
+    done <- read_tsv(ckpt, col_types = cols(shuffle = "i", status = "c", message = "c", end = "i", .default = "d"),
+                     progress = FALSE) |>
+      suppressWarnings() |>
+      filter(end %in% 1, !is.na(status), shuffle %in% 0:N_SHUFFLES) |>
+      distinct(shuffle, .keep_all = TRUE)
+    write_tsv(done, ckpt, na = "NA")
+  }
+  timed_out <- any(str_detect(done$message, "^mph: timed out"), na.rm = TRUE)
   map(0:N_SHUFFLES, \(k) {
-    if (timed_out) return(tibble(shuffle = k, status = "failed", message = "not run: an earlier shuffle timed out"))
-    fit <- fit_k(k)
-    if (!fit$ok) {
-      if (str_detect(fit$msg, "^timed out")) timed_out <<- TRUE
-      return(tibble(shuffle = k, status = "failed", message = paste("mph:", fit$msg)))
+    if (k %in% done$shuffle) return(filter(done, shuffle == k) |> select(-end))
+    row <- if (timed_out) {
+      tibble(shuffle = k, status = "failed", message = "not run: an earlier shuffle timed out")
+    } else {
+      fit <- fit_k(k)
+      if (!fit$ok) {
+        if (str_detect(fit$msg, "^timed out")) timed_out <<- TRUE
+        tibble(shuffle = k, status = "failed", message = paste("mph:", fit$msg))
+      } else row_k(fit$fit) |> mutate(shuffle = k, .before = 1)
     }
-    row_k(fit$fit) |> mutate(shuffle = k, .before = 1)
+    row <- bind_rows(template, mutate(row, end = 1L))
+    write_tsv(row, ckpt, append = file.exists(ckpt), na = "NA")
+    select(row, -end)
   }) |>
-    list_rbind() |>
-    bind_rows(tibble(!!!set_names(rep(list(double()), length(cols)), cols)))
+    list_rbind()
 }
 
 # Local-only model (Wheeler Table 1): expression residualised on the step 03
 # covariates (OLS), residuals shuffled across donors, intercept-only MPH fits.
-fit_shuffles_local <- function(g, tissue, mpheno, K_all) {
+fit_shuffles_local <- function(g, tissue, mpheno, K_all, ckpt) {
   d <- tissue_design(file.path(p$pheno, tissue), keep = chunk_mpheno[[tissue]])
   y <- d$Y[, paste0("g", mpheno)]
   keep <- !is.na(y)
@@ -120,7 +141,7 @@ fit_shuffles_local <- function(g, tissue, mpheno, K_all) {
       tibble(status = if (bad || f$n_iter >= MPH_MAXIT) "failed" else "ok", h2 = f$pve[1], se = f$se_pve[1],
              message = if (bad) "mph: degenerate" else if (f$n_iter >= MPH_MAXIT) "mph: reached --num_iterations"
                        else NA_character_)
-    }, c("h2", "se")) |>
+    }, c("h2", "se"), ckpt) |>
     mutate(tissue = tissue, n = length(r), .before = 1)
 }
 
@@ -131,7 +152,7 @@ fit_shuffles_local <- function(g, tissue, mpheno, K_all) {
 # K o T becomes K_k o T. This is the null of perm1 (step 03 --perm-seed):
 # no genetic mesor and no genetic rhythm, population rhythm kept. Shuffle 0 is
 # the unshuffled fit (same model as step 04). h2 = h2_mesor, h2_rhy = rhythmic.
-fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all) {
+fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all, ckpt) {
   d <- tissue_design(file.path(p$pheno, tissue), keep = chunk_mpheno[[tissue]])
   y <- d$Y[, paste0("g", mpheno)]
   keep <- !is.na(y)
@@ -163,7 +184,7 @@ fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all) {
              var_g1 = f$var[1], var_g2 = f$var[2], var_e = f$var[3],
              message = if (bad) "mph: degenerate" else if (f$n_iter >= MPH_MAXIT) "mph: reached --num_iterations"
                        else NA_character_)
-    }, c("h2", "se", "h2_rhy", "se_rhy", "var_g1", "var_g2", "var_e")) |>
+    }, c("h2", "se", "h2_rhy", "se_rhy", "var_g1", "var_g2", "var_e"), ckpt) |>
     mutate(tissue = tissue, n = length(iid), .before = 1)
 }
 
@@ -190,9 +211,10 @@ fit_gene <- function(g) {
     f <- file.path(gene_dir, paste0(g$gene_id, "__", t, ".tsv"))
     if (file.exists(f)) return(read_tsv(f, col_types = cols(message = "c"), progress = FALSE))
     t_t <- Sys.time()
-    out <- fit_shuffles(g, t, k, K_all)
+    out <- fit_shuffles(g, t, k, K_all, paste0(f, ".shuffles"))
     write_tsv(out, paste0(f, ".partial"))
     file.rename(paste0(f, ".partial"), f)
+    unlink(paste0(f, ".shuffles"))
     message(format(Sys.time(), "%H:%M:%S"), "   ", g$gene_id, " ", t, ": n = ", out$n[1], ", ",
             sum(out$status == "failed"), " of ", nrow(out), " failed, ",
             round(as.numeric(difftime(Sys.time(), t_t, units = "secs"))), " s")
