@@ -37,6 +37,10 @@ out_dir <- file.path(p$results, "shuffle")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_file <- file.path(out_dir, sprintf("chunk_%04d.tsv", chunk))
 if (file.exists(out_file)) {
+  # a chunk file from another model (e.g. a local-only run under this label) is not done
+  if (MODEL == "local_rhythmic" && !"h2_rhy" %in% str_split_1(read_lines(out_file, n_max = 1), "\t")) {
+    stop(out_file, " has no h2_rhy column (written by a local-only run): move it away and rerun")
+  }
   message("Chunk ", chunk, " already done: ", out_file)
   quit(save = "no")
 }

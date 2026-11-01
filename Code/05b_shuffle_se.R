@@ -42,6 +42,13 @@ fits <- map(files[file.exists(files)], \(f)
            col_types = cols(tissue = "c", gene_id = "c", n = "i", shuffle = "i", status = "c", .default = "d"))) |>
   list_rbind()
 if (nrow(fits) == 0) stop("No step 04b output in ", file.path(p$results, "shuffle"))
+# rhythmic run: every chunk must come from the rhythmic model (h2_rhy column)
+if (MODEL == "local_rhythmic") {
+  no_rhy <- files[file.exists(files)][!map_lgl(files[file.exists(files)], \(f)
+    "h2_rhy" %in% str_split_1(read_lines(f, n_max = 1), "\t"))]
+  if (length(no_rhy)) stop(length(no_rhy), " chunk(s) have no h2_rhy column (local-only fits), e.g. ",
+                           paste(basename(head(no_rhy, 5)), collapse = ", "), ": move them away and rerun them")
+}
 
 genes <- read_tsv(file.path(p$genes, "genes.tsv"), col_types = cols(chr = "c"), progress = FALSE)
 n_all <- map(unique(fits$tissue), \(t)
