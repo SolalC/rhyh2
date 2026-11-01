@@ -34,7 +34,12 @@ p <- out_paths(OUT_DIR, run_label(NA))
 files <- file.path(p$results, "shuffle", sprintf("chunk_%04d.tsv", seq_len(SHUFFLE_N_CHUNKS)))
 missing <- which(!file.exists(files))
 if (length(missing)) message("Missing ", length(missing), " chunk(s): ", paste(head(missing, 20), collapse = ", "))
-fits <- map(files[file.exists(files)], \(f) read_tsv(f, col_types = cols(chr = "c", message = "c"), progress = FALSE)) |>
+# only the columns used below: the rhythmic run has ~45 million rows, and the
+# text columns (message, gene_name, chr) alone exceed 32G once combined
+keep_cols <- c("tissue", "gene_id", "n", "shuffle", "status", "h2", "h2_rhy")
+fits <- map(files[file.exists(files)], \(f)
+  read_tsv(f, col_select = any_of(keep_cols), progress = FALSE,
+           col_types = cols(tissue = "c", gene_id = "c", n = "i", shuffle = "i", status = "c", .default = "d"))) |>
   list_rbind()
 if (nrow(fits) == 0) stop("No step 04b output in ", file.path(p$results, "shuffle"))
 
