@@ -44,6 +44,18 @@ run_label <- function(perm_seed = NA, model = get0("MODEL", ifnotfound = "local_
                                if (engine != "gcta") engine, base)))
 }
 
+# Step 04b-05b shuffle runs: folder and file suffix by SHUFFLE_TARGET
+# ("genotype", default: shuffle/; "phase": shuffle_phase/), and the tag in the
+# 04b log line (the label, plus ";phase" for the phase run).
+shuffle_target <- function() {
+  t <- get0("SHUFFLE_TARGET", ifnotfound = "genotype")
+  if (!t %in% c("genotype", "phase")) stop("SHUFFLE_TARGET must be \"genotype\" or \"phase\"")
+  if (t == "phase" && get0("MODEL", ifnotfound = "") != "local_rhythmic") stop("SHUFFLE_TARGET = \"phase\" needs MODEL = \"local_rhythmic\"")
+  t
+}
+shuffle_suffix <- function() if (shuffle_target() == "phase") "_phase" else ""
+shuffle_tag <- function() paste0(run_label(NA), if (shuffle_target() == "phase") ";phase")
+
 out_paths <- function(out_dir, label = "observed") {
   p <- list(
     geno    = file.path(out_dir, "genotypes"),

@@ -22,7 +22,9 @@
 #   means). Also writes summary/<label>/tissue_means_shuffle_se.png: observed
 #   tissue means of h2_mesor and h2_rhy (step 05), error bars +- the shuffle SD
 #   of each (sd_shuffle_mean_all), and the null mean of the shuffles (grey).
-#   Writes summary/<label>/shuffle_se.tsv.
+#   Writes summary/<label>/shuffle_se.tsv. With SHUFFLE_TARGET = "phase"
+#   (config_rhy_phase.R): reads shuffle_phase/ and writes shuffle_se_phase.tsv
+#   and tissue_means_shuffle_se_phase.png.
 #
 # Usage: Rscript 05b_shuffle_se.R
 
@@ -31,7 +33,8 @@ load_config()
 SHUFFLE_N_CHUNKS <- get0("SHUFFLE_N_CHUNKS", ifnotfound = 2000)
 p <- out_paths(OUT_DIR, run_label(NA))
 
-files <- file.path(p$results, "shuffle", sprintf("chunk_%04d.tsv", seq_len(SHUFFLE_N_CHUNKS)))
+shuf <- file.path(p$results, paste0("shuffle", shuffle_suffix()))
+files <- file.path(shuf, sprintf("chunk_%04d.tsv", seq_len(SHUFFLE_N_CHUNKS)))
 missing <- which(!file.exists(files))
 if (length(missing)) message("Missing ", length(missing), " chunk(s): ", paste(head(missing, 20), collapse = ", "))
 # only the columns used below: the rhythmic run has ~45 million rows, and the
@@ -41,7 +44,7 @@ fits <- map(files[file.exists(files)], \(f)
   read_tsv(f, col_select = any_of(keep_cols), progress = FALSE,
            col_types = cols(tissue = "c", gene_id = "c", n = "i", shuffle = "i", status = "c", .default = "d"))) |>
   list_rbind()
-if (nrow(fits) == 0) stop("No step 04b output in ", file.path(p$results, "shuffle"))
+if (nrow(fits) == 0) stop("No step 04b output in ", shuf)
 # rhythmic run: every chunk must come from the rhythmic model (h2_rhy column)
 if (MODEL == "local_rhythmic") {
   no_rhy <- files[file.exists(files)][!map_lgl(files[file.exists(files)], \(f)
@@ -120,7 +123,8 @@ per_tissue <- per_tissue |>
   select(-key) |>
   arrange(tissue)
 
-write_tsv(per_tissue, file.path(p$summary, "shuffle_se.tsv"))
+out_tsv <- file.path(p$summary, paste0("shuffle_se", shuffle_suffix(), ".tsv"))
+write_tsv(per_tissue, out_tsv)
 print(per_tissue, n = Inf, width = Inf)
 m <- filter(per_tissue, !is.na(se_perm_wheeler))
 if (nrow(m) >= 3) {
@@ -131,12 +135,22 @@ if (nrow(m) >= 3) {
           signif(median(m$sd_shuffle_mean_all / m$se_perm_wheeler, na.rm = TRUE), 2), ", se_wheeler_code ",
           signif(median(m$se_wheeler_code / m$se_perm_wheeler, na.rm = TRUE), 2))
 }
-message("Written to ", file.path(p$summary, "shuffle_se.tsv"))
+message("Written to ", out_tsv)
 
 # ---- rhythmic model: tissue means with the shuffle SDs ------------------------
 if (rhythmic && all(c("mean_h2_obs", "mean_h2_rhy_obs") %in% names(per_tissue))) {
   suppressPackageStartupMessages(library(ggplot2))
   d <- filter(per_tissue, !is.na(mean_h2_obs), !is.na(mean_h2_rhy_obs)) |> mutate(label = gsub("_", " ", tissue))
+  # phase run: K is not shuffled, so it has no null for h2_mesor; the x error
+  # bars and null mean come from the genotype-shuffle run (shuffle_se.tsv)
+  subtitle <- "Grey: null mean of the shuffled fits per tissue"
+  if (shuffle_target() == "phase") {
+    geno_file <- file.path(p$summary, "shuffle_se.tsv")
+    if (!file.exists(geno_file)) stop("Phase run: no ", geno_file, " (genotype-shuffle run) for the h2_mesor null")
+    geno <- read_tsv(geno_file, show_col_types = FALSE) |> select(tissue, sd_shuffle_mean_all, mean_null)
+    d <- d |> select(-sd_shuffle_mean_all, -mean_null) |> left_join(geno, by = "tissue")
+    subtitle <- "x: genotype-shuffle null (shuffle_se.tsv); y: phase-shuffle null. Grey: null means"
+  }
   g <- ggplot(d, aes(mean_h2_obs, mean_h2_rhy_obs)) +
     geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
     geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
@@ -147,8 +161,9 @@ if (rhythmic && all(c("mean_h2_obs", "mean_h2_rhy_obs") %in% names(per_tissue)))
                   orientation = "y", width = 0, linewidth = 0.4) +
     geom_point(aes(colour = label), size = 2) +
     labs(x = quote(h^2 ~ mesor), y = quote(h^2 ~ rhythmic), colour = NULL,
-         title = sprintf("Tissue means over genes (mean \u00b1 SD of the mean over %d shuffles)", max(d$n_shuffles)),
-         subtitle = "Grey: null mean of the shuffled fits per tissue") +
+         title = sprintf("Tissue means over genes (mean \u00b1 SD of the mean over %d %s shuffles)", max(d$n_shuffles),
+                         shuffle_target()),
+         subtitle = subtitle) +
     theme_bw(base_size = 11) +
     theme(panel.grid.minor = element_blank())
   if (requireNamespace("ggrepel", quietly = TRUE)) {
@@ -159,6 +174,7 @@ if (rhythmic && all(c("mean_h2_obs", "mean_h2_rhy_obs") %in% names(per_tissue)))
     g <- g + theme(legend.position = "right", legend.text = element_text(size = 7)) +
       guides(colour = guide_legend(ncol = 1 + (nrow(d) > 25)))
   }
-  ggsave(file.path(p$summary, "tissue_means_shuffle_se.png"), g, width = 10, height = 8, dpi = 150)
-  message("Plot written to ", file.path(p$summary, "tissue_means_shuffle_se.png"))
+  out_png <- file.path(p$summary, paste0("tissue_means_shuffle_se", shuffle_suffix(), ".png"))
+  ggsave(out_png, g, width = 10, height = 8, dpi = 150)
+  message("Plot written to ", out_png)
 }

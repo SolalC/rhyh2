@@ -2,8 +2,10 @@
 # Read-only status of a shuffle run (step 04b) and an estimate of the CPU time
 # still needed. Changes nothing. Default: the rhythmic run; for the Table 1 run
 #   LABEL=mph/observed bash check_04b.sh
+#   TARGET=phase bash check_04b.sh   # the phase-shuffle run (config_rhy_phase.R)
 LABEL=${LABEL:-local_rhythmic/peer_rhythm/mph/observed}
-SHUF=${SHUF:-/scratch/user/uqschauq/rhyh2/wheeler2016/results/$LABEL/shuffle}
+SHUF=${SHUF:-/scratch/user/uqschauq/rhyh2/wheeler2016/results/$LABEL/shuffle${TARGET:+_$TARGET}}
+[[ ${TARGET:-} == phase ]] && LABEL="$LABEL;phase"   # tag in the 04b log lines
 LOGS=${LOGS:-/scratch/user/uqschauq/rhyh2-mph/Code/slurm/logs}
 N=${N:-2000}; WALL_H=${WALL_H:-24}
 done_list=$(ls "$SHUF" 2>/dev/null | sed -n 's/^chunk_0*\([0-9]*\)\.tsv$/\1/p')

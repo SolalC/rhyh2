@@ -33,7 +33,7 @@ p <- out_paths(OUT_DIR, label)
 source(file.path(code_dir(), "R", "grm_io.R"))
 source(file.path(code_dir(), "R", "mph.R"))
 
-out_dir <- file.path(p$results, "shuffle")
+out_dir <- file.path(p$results, paste0("shuffle", shuffle_suffix()))
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_file <- file.path(out_dir, sprintf("chunk_%04d.tsv", chunk))
 if (file.exists(out_file)) {
@@ -61,7 +61,7 @@ genes <- genes |>
   mutate(gene_index = row_number())
 chunk_id <- cut(seq_len(nrow(genes)), breaks = min(SHUFFLE_N_CHUNKS, nrow(genes)), labels = FALSE)
 my_genes <- genes[chunk_id == chunk, ]
-message("Chunk ", chunk, "/", SHUFFLE_N_CHUNKS, " (", label, "): ", nrow(my_genes), " of ", nrow(genes),
+message("Chunk ", chunk, "/", SHUFFLE_N_CHUNKS, " (", shuffle_tag(), "): ", nrow(my_genes), " of ", nrow(genes),
         " genes, ", N_SHUFFLES, " shuffles each")
 
 chunk_mpheno <- tissue_genes |> filter(gene_id %in% my_genes$gene_id) |> with(split(mpheno, tissue))
@@ -156,6 +156,10 @@ fit_shuffles_local <- function(g, tissue, mpheno, K_all, ckpt) {
 # K o T becomes K_k o T. This is the null of perm1 (step 03 --perm-seed):
 # no genetic mesor and no genetic rhythm, population rhythm kept. Shuffle 0 is
 # the unshuffled fit (same model as step 04). h2 = h2_mesor, h2_rhy = rhythmic.
+# SHUFFLE_TARGET = "phase": the phases inside T are permuted instead (K o T_k,
+# T_k = cos(w(t_pi(i) - t_pi(j)))), while K, expression, covariates and the
+# fixed cos/sin of the true phase are kept. Null: h2_rhy = 0 with the genetic
+# mesor and the population rhythm intact.
 fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all, ckpt) {
   d <- tissue_design(file.path(p$pheno, tissue), keep = chunk_mpheno[[tissue]])
   y <- d$Y[, paste0("g", mpheno)]
@@ -176,9 +180,15 @@ fit_shuffles_rhythmic <- function(g, tissue, mpheno, K_all, ckpt) {
   perms <- cbind(seq_along(iid), replicate(N_SHUFFLES, sample(length(iid))))
   run_shuffles(
     \(k) {
-      K_k <- K[perms[, k + 1], perms[, k + 1]]
-      write_grm_mph(file.path(tmp, "mph_K_loc"), K_k, iid)
-      write_grm_mph(file.path(tmp, "mph_K_rhy"), rhythmic_kernel(K_k, phase, PHASE_PERIOD), iid)
+      pi_k <- perms[, k + 1]
+      if (shuffle_target() == "phase") {
+        if (k == 0) write_grm_mph(file.path(tmp, "mph_K_loc"), K, iid)   # K is the same in every shuffle
+        write_grm_mph(file.path(tmp, "mph_K_rhy"), rhythmic_kernel(K, phase[pi_k], PHASE_PERIOD), iid)
+      } else {
+        K_k <- K[pi_k, pi_k]
+        write_grm_mph(file.path(tmp, "mph_K_loc"), K_k, iid)
+        write_grm_mph(file.path(tmp, "mph_K_rhy"), rhythmic_kernel(K_k, phase, PHASE_PERIOD), iid)
+      }
       run_mph(file.path(tmp, c("mph_K_loc", "mph_K_rhy")), inputs, "y", file.path(tmp, "mph"))
     },
     \(f) {
